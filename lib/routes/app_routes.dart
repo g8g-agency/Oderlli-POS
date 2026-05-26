@@ -1,0 +1,23 @@
+/// Application route name constants for Orderlli POS.
+abstract final class AppRoutes {
+  // Splash / Authentication
+  static const String splash = '/';
+  static const String login = '/login';
+
+  // Top-level Dashboard / Side navigation routes
+  static const String dashboard = '/dashboard';
+  static const String floor = '/floor';
+  static const String orders = '/orders';
+  static const String kitchen = '/kitchen';
+  static const String shifts = '/shifts';
+  static const String settings = '/settings';
+  static const String menu = '/menu';
+  static const String cart = '/cart';
+
+  // Checkout nested shell routes
+  static const String billing = '/checkout';
+  static const String payments = '/checkout/payment';
+  static const String splitBilling = '/checkout/split-billing';
+  static const String refunds = '/checkout/refund';
+}
+

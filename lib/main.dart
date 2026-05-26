@@ -1,0 +1,64 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+import 'routes/app_router.dart';
+import 'theme/app_theme.dart';
+import 'core/constants/app_constants.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Force landscape for tablet POS
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
+
+  // Hide status / navigation bars for full-screen POS experience
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+  runApp(
+    const ProviderScope(
+      child: OrderlliApp(),
+    ),
+  );
+}
+
+class OrderlliApp extends StatelessWidget {
+  const OrderlliApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ScreenUtilInit(
+      // Design canvas matches a 10-inch tablet in landscape
+      designSize: const Size(
+        AppConstants.designWidth,
+        AppConstants.designHeight,
+      ),
+      minTextAdapt: true,
+      splitScreenMode: true,
+      builder: (context, child) {
+        return MaterialApp.router(
+          title: 'Orderlli POS',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          themeMode: ThemeMode.light,
+          routerConfig: appRouter,
+          builder: (context, child) {
+            final mediaQueryData = MediaQuery.of(context);
+            final clampedTextScaler = mediaQueryData.textScaler.clamp(
+              minScaleFactor: 0.8,
+              maxScaleFactor: 1.25,
+            );
+            return MediaQuery(
+              data: mediaQueryData.copyWith(textScaler: clampedTextScaler),
+              child: child!,
+            );
+          },
+        );
+      },
+    );
+  }
+}
