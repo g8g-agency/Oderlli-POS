@@ -539,7 +539,10 @@ class POSHeader extends StatelessWidget {
       children: [
         Text('New Order', style: LightPOSTypography.headlineLarge),
         Gap(AppSpacing.xxs.h),
-        Row(
+        Wrap(
+          spacing: 4.w,
+          runSpacing: 4.h,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             _buildMetadataItem(Icons.devices_other, 'Terminal 1'),
             _buildDotSeparator(),
