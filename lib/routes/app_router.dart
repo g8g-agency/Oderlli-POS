@@ -6,7 +6,8 @@ import '../screens/login/login_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/floor/floor_screen.dart';
 import '../screens/orders/orders_screen.dart';
-import '../screens/kitchen/kitchen_screen.dart';
+// NOTE: kitchen_screen.dart import removed — the route is disabled but the file,
+// models, enums, and providers are preserved for future backend integration.
 import '../screens/shifts/shifts_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/menu/menu_screen.dart';
@@ -60,11 +61,13 @@ final GoRouter appRouter = GoRouter(
           name: 'orders',
           builder: (context, state) => const OrdersScreen(),
         ),
-        GoRoute(
-          path: AppRoutes.kitchen,
-          name: 'kitchen',
-          builder: (context, state) => const KitchenScreen(),
-        ),
+        // Kitchen KDS route disabled. Screen, models, enums and providers are intact.
+        // Re-add this GoRoute to restore KDS navigation when the backend is ready.
+        // GoRoute(
+        //   path: AppRoutes.kitchen,
+        //   name: 'kitchen',
+        //   builder: (context, state) => const KitchenScreen(),
+        // ),
         GoRoute(
           path: AppRoutes.shifts,
           name: 'shifts',

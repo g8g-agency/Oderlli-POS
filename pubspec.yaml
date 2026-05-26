@@ -32,6 +32,9 @@ dependencies:
   # SVG rendering
   flutter_svg: ^2.0.17
 
+  # Internationalisation & Indian number formatting
+  intl: ^0.19.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

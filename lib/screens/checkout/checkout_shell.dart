@@ -119,63 +119,75 @@ class CheckoutShell extends ConsumerWidget {
       backgroundColor: AppColors.background,
       body: Row(
         children: [
-          // ── Left Side: Persistent Bill Receipt Summary (Fixed width with safety limits) ────────────────────
-          Container(
-            constraints: BoxConstraints(
-              minWidth: 280.w,
-              maxWidth: 360.w,
-            ),
-            color: AppColors.sidebarBg,
-            padding: EdgeInsets.all(16.r),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with Back Button
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        ref.read(activeTableIdProvider.notifier).state = null;
-                        context.go('/floor');
-                      },
-                      icon: const Icon(Icons.arrow_back),
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.surface,
-                        side: const BorderSide(color: AppColors.border),
+          // ── Left: Receipt Summary — flex 3 (responsive, scales with screen) ──
+          Flexible(
+            flex: 3,
+            child: Container(
+              color: AppColors.sidebarBg,
+              padding: EdgeInsets.all(16.r),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header with Back Button
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          ref.read(activeTableIdProvider.notifier).state = null;
+                          context.go('/floor');
+                        },
+                        icon: const Icon(Icons.arrow_back),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.surface,
+                          side: const BorderSide(color: AppColors.border),
+                        ),
+                      ),
+                      Gap(16.w),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Table ${order.tableNumber} Receipt',
+                              style: AppTextStyles.titleLarge,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'Order #$shortOrderId',
+                              style: AppTextStyles.bodySmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Gap(16.h),
+                  // Bill Items List
+                  Expanded(
+                    child: POSCard(
+                      child: _buildReceiptContent(
+                        billItems,
+                        subtotal,
+                        discount,
+                        tax,
+                        serviceCharge,
+                        total,
+                        billState,
                       ),
                     ),
-                    Gap(16.w),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Table ${order.tableNumber} Receipt', style: AppTextStyles.titleLarge),
-                        Text('Order #$shortOrderId', style: AppTextStyles.bodySmall),
-                      ],
-                    ),
-                  ],
-                ),
-                Gap(16.h),
-                // Bill Items List
-                Expanded(
-                  child: POSCard(
-                    child: _buildReceiptContent(
-                      billItems,
-                      subtotal,
-                      discount,
-                      tax,
-                      serviceCharge,
-                      total,
-                      billState,
-                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           // Vertical divider line
           Container(width: 1.w, color: AppColors.border),
-          // ── Right Side: Sub-views (Billing, Payments, Split, etc.) ────────
+          // ── Right: Sub-views — flex 7 ─────────────────────────────────────
           Expanded(
+            flex: 7,
             child: child,
           ),
         ],

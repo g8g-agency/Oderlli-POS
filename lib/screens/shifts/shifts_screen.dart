@@ -4,6 +4,7 @@ import 'package:gap/gap.dart';
 import '../../theme/theme.dart';
 import '../../widgets/widgets.dart';
 import '../../core/extensions/extensions.dart';
+import '../../core/utils/currency_formatter.dart';
 
 class ShiftsScreen extends StatelessWidget {
   const ShiftsScreen({super.key});
@@ -114,7 +115,7 @@ class ShiftsScreen extends StatelessWidget {
             Expanded(
               child: MetricTile(
                 label: 'Opening Cash',
-                value: '£150.00',
+                value: CurrencyFormatter.format(15000.0),
                 icon: Icons.vpn_key_outlined,
                 color: AppColors.neutral,
               ),
@@ -123,7 +124,7 @@ class ShiftsScreen extends StatelessWidget {
             Expanded(
               child: MetricTile(
                 label: 'Net Cash Sales',
-                value: '£435.50',
+                value: CurrencyFormatter.format(43550.0),
                 icon: Icons.add_chart_outlined,
                 color: AppColors.success,
               ),
@@ -136,7 +137,7 @@ class ShiftsScreen extends StatelessWidget {
             Expanded(
               child: MetricTile(
                 label: 'Payouts / Payout',
-                value: '-£45.00',
+                value: CurrencyFormatter.formatNegative(4500.0),
                 icon: Icons.outbox_outlined,
                 color: AppColors.loss,
               ),
@@ -145,7 +146,7 @@ class ShiftsScreen extends StatelessWidget {
             Expanded(
               child: MetricTile(
                 label: 'Expected Cash',
-                value: '£540.50',
+                value: CurrencyFormatter.format(54050.0),
                 icon: Icons.account_balance_wallet_outlined,
                 color: AppColors.cash,
               ),
@@ -222,21 +223,21 @@ class ShiftsScreen extends StatelessWidget {
         time: '08:30 PM',
         type: 'Cash Out / Payout',
         desc: 'Supplier pay (Fresh veg)',
-        amount: '-£45.00',
+        amount: '-₹4,500.00',
         color: AppColors.loss,
       ),
       const _ActivityLogItem(
         time: '06:12 PM',
         type: 'Cash Sale',
         desc: 'Bill #23048',
-        amount: '+£84.20',
+        amount: '+₹8,420.00',
         color: AppColors.success,
       ),
       const _ActivityLogItem(
         time: '04:00 PM',
         type: 'Shift Opened',
         desc: 'Opening drawer verify',
-        amount: '£150.00',
+        amount: '₹15,000.00',
         color: AppColors.neutral,
       ),
     ];

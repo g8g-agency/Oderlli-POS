@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import '../theme/theme.dart';
+import '../core/utils/currency_formatter.dart';
 
 /// ─── Orderlli POS · Financial Summary Widget ────────────────────────────────
 ///
 /// A premium reusable widget to render subtotals, tax rates, promotions/discounts,
 /// and total bill amounts consistently across checkout, billing, and cart screens.
+///
+/// Currency is formatted via [CurrencyFormatter] — never hardcode symbols here.
 class FinancialSummary extends StatelessWidget {
   const FinancialSummary({
     super.key,
@@ -37,21 +40,21 @@ class FinancialSummary extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (showDetails) ...[
-          _buildRow('Subtotal', '\$${subtotal.toStringAsFixed(2)}'),
+          _buildRow('Subtotal', CurrencyFormatter.format(subtotal)),
           Gap(8.h),
           if (computedDiscount > 0) ...[
             _buildRow(
               discountPercent > 0
                   ? 'Discount (${discountPercent.toInt()}%)'
                   : 'Discount',
-              '-\$${computedDiscount.toStringAsFixed(2)}',
+              CurrencyFormatter.formatNegative(computedDiscount),
               isPromo: true,
             ),
             Gap(8.h),
           ],
           _buildRow(
             'Sales Tax (${taxPercent.toInt()}%)',
-            '\$${computedTax.toStringAsFixed(2)}',
+            CurrencyFormatter.format(computedTax),
           ),
           Gap(12.h),
           Container(height: 1.h, color: AppColors.border),
@@ -63,15 +66,13 @@ class FinancialSummary extends StatelessWidget {
               'Total Bill',
               style: AppTextStyles.titleLarge.copyWith(
                 fontWeight: FontWeight.w800,
-                fontSize: 18.sp,
               ),
             ),
             const Spacer(),
             Text(
-              '\$${total.toStringAsFixed(2)}',
+              CurrencyFormatter.format(total),
               style: AppTextStyles.priceLarge.copyWith(
                 color: AppColors.primary,
-                fontSize: 24.sp,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -102,3 +103,4 @@ class FinancialSummary extends StatelessWidget {
     );
   }
 }
+

@@ -147,12 +147,9 @@ class _Sidebar extends ConsumerWidget {
       activeIcon: Icons.receipt_long,
       route: AppRoutes.orders,
     ),
-    _NavItem(
-      label: 'Kitchen KDS',
-      icon: Icons.soup_kitchen_outlined,
-      activeIcon: Icons.soup_kitchen,
-      route: AppRoutes.kitchen,
-    ),
+    // Kitchen KDS nav item removed intentionally.
+    // The KDS screen, route constant, models, enums, and providers are preserved
+    // for future backend integration. Only UI navigation exposure is disabled.
     _NavItem(
       label: 'Shifts',
       icon: Icons.vpn_key_outlined,

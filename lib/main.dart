@@ -48,9 +48,11 @@ class OrderlliApp extends StatelessWidget {
           routerConfig: appRouter,
           builder: (context, child) {
             final mediaQueryData = MediaQuery.of(context);
+            // Clamp text scaling: prevents Windows 125%/150% DPI from
+            // breaking POS layouts while still supporting mild accessibility scaling.
             final clampedTextScaler = mediaQueryData.textScaler.clamp(
-              minScaleFactor: 0.8,
-              maxScaleFactor: 1.25,
+              minScaleFactor: 0.85,
+              maxScaleFactor: 1.10,
             );
             return MediaQuery(
               data: mediaQueryData.copyWith(textScaler: clampedTextScaler),

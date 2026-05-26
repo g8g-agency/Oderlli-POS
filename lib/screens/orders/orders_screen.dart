@@ -148,6 +148,73 @@ class _OrderRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statusColor = _statusColor(order.status);
+    final isCompact = context.screenWidth < 850;
+
+    if (isCompact) {
+      return Container(
+        padding: EdgeInsets.all(16.r),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status indicator
+            Container(
+              width: 4.w,
+              height: 64.h,
+              decoration: BoxDecoration(
+                color: statusColor,
+                borderRadius: BorderRadius.circular(4.r),
+              ),
+            ),
+            Gap(12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Table ${order.tableNumber}',
+                        style: AppTextStyles.titleLarge,
+                      ),
+                      Text(
+                        order.total.asCurrency,
+                        style: AppTextStyles.priceTag,
+                      ),
+                    ],
+                  ),
+                  Gap(4.h),
+                  Text(
+                    order.items
+                        .map((i) => '${i.quantity}× ${i.menuItem.name}')
+                        .join(', '),
+                    style: AppTextStyles.bodySmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Gap(8.h),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        order.createdAt.minutesAgoLabel,
+                        style: AppTextStyles.bodySmall,
+                      ),
+                      _StatusPill(status: order.status, color: statusColor),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       padding: EdgeInsets.all(16.r),
@@ -184,8 +251,8 @@ class _OrderRow extends ConsumerWidget {
             ],
           ),
           Gap(24.w),
-          // Items summary
-          Expanded(
+          // Items summary — Flexible prevents overflow at narrow widths
+          Flexible(
             child: Text(
               order.items
                   .map((i) => '${i.quantity}× ${i.menuItem.name}')
@@ -199,32 +266,14 @@ class _OrderRow extends ConsumerWidget {
           // Total
           Text(order.total.asCurrency, style: AppTextStyles.priceTag),
           Gap(16.w),
-          // Status badge + action
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _StatusPill(status: order.status, color: statusColor),
-              Gap(8.h),
-              if (_nextStatus(order.status) != null)
-                _ActionButton(
-                  label: 'Mark ${_nextStatus(order.status)!.label}',
-                  onTap: () => ref
-                      .read(ordersProvider.notifier)
-                      .updateStatus(order.id, _nextStatus(order.status)!),
-                ),
-            ],
-          ),
+          // Status badge — passive display only, no interaction
+          // Cashiers can SEE KDS status but cannot change it from this screen.
+          _StatusPill(status: order.status, color: statusColor),
         ],
       ),
     );
   }
 
-  OrderStatus? _nextStatus(OrderStatus s) => switch (s) {
-        OrderStatus.pending => OrderStatus.preparing,
-        OrderStatus.preparing => OrderStatus.ready,
-        OrderStatus.ready => OrderStatus.served,
-        _ => null,
-      };
 
   Color _statusColor(OrderStatus status) => switch (status) {
         OrderStatus.pending => AppColors.statusPending,
@@ -259,36 +308,6 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(8.r),
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            label,
-            style: AppTextStyles.labelSmall.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _CountBadge extends StatelessWidget {
   const _CountBadge({required this.count, this.small = false});

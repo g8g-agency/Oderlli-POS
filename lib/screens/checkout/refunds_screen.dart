@@ -4,6 +4,7 @@ import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/theme.dart';
 import '../../widgets/widgets.dart';
+import '../../core/utils/currency_formatter.dart';
 
 class RefundsScreen extends StatefulWidget {
   const RefundsScreen({super.key});
@@ -103,7 +104,7 @@ class _RefundsScreenState extends State<RefundsScreen> {
                                   ],
                                 ),
                                 Gap(AppSpacing.md.h),
-                                Text('Paid: £42.30 · Date: Today 12:45 PM · Server: Sarah', style: AppTypography.bodySmall),
+                                Text('Paid: ${CurrencyFormatter.format(4230.0)} · Date: Today 12:45 PM · Server: Sarah', style: AppTypography.bodySmall),
                                 Gap(AppSpacing.lg.h),
                                 Container(height: 1.h, color: AppColors.border),
                                 Gap(AppSpacing.md.h),

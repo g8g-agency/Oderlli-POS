@@ -315,7 +315,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     } else {
       mainContent = Row(
         children: [
+          // Cart items list — flex 3 = wider area
           Expanded(
+            flex: 3,
             child: Column(
               children: [
                 headerWidget,
@@ -325,8 +327,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           ),
           // Vertical divider line
           Container(width: 1.w, color: AppColors.border),
-          SizedBox(
-            width: 360,
+          // Dispatch panel — flex 2 = responsive width
+          Flexible(
+            flex: 2,
             child: dispatchWidget,
           ),
         ],

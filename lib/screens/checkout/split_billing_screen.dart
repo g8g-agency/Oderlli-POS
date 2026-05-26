@@ -8,6 +8,7 @@ import '../../theme/theme.dart';
 import '../../widgets/widgets.dart';
 import '../../providers/providers.dart';
 import '../../core/extensions/extensions.dart';
+import '../../core/utils/currency_formatter.dart';
 
 class SplitBillingScreen extends ConsumerStatefulWidget {
   const SplitBillingScreen({super.key});
@@ -497,9 +498,9 @@ class _SplitBillingScreenState extends ConsumerState<SplitBillingScreen> {
                   onChanged: (val) {
                     setState(() {});
                   },
-                  decoration: const InputDecoration(
-                    prefixText: '£',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  decoration: InputDecoration(
+                    prefixText: CurrencyFormatter.symbol,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                   ),
                   style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
                 ),

@@ -289,9 +289,9 @@ class MenuScreen extends ConsumerWidget {
           // Divider
           Container(width: 1.w, color: LightPOSColors.border),
 
-          // ── 3. Active Checkout Cart Panel (Right) ─────────────────────────
-          SizedBox(
-            width: 380.w,
+          // ── 3. Active Checkout Cart Panel (Right) — flex 2 scales responsively ─
+          Flexible(
+            flex: 2,
             child: OrderCartPanel(
               cartState: cartState,
               activeTable: activeTable,
@@ -358,7 +358,6 @@ class POSSidebar extends StatelessWidget {
                 _buildNavItem(context, 'Dashboard', Icons.dashboard_outlined, AppRoutes.dashboard),
                 _buildNavItem(context, 'Floor Plan', Icons.table_restaurant_outlined, AppRoutes.floor),
                 _buildNavItem(context, 'New Order', Icons.shopping_bag_outlined, AppRoutes.menu),
-                _buildNavItem(context, 'Kitchen KDS', Icons.soup_kitchen_outlined, AppRoutes.kitchen),
                 _buildNavItem(context, 'Shifts', Icons.vpn_key_outlined, AppRoutes.shifts),
                 _buildNavItem(context, 'Settings', Icons.settings_outlined, AppRoutes.settings),
                 
@@ -384,10 +383,6 @@ class POSSidebar extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _buildMetricTile(Icons.table_restaurant, '4/12', 'Tables'),
-                      ),
-                      Gap(AppSpacing.xs.w),
-                      Expanded(
-                        child: _buildMetricTile(Icons.timer_outlined, '3 ord', 'KDS Queue'),
                       ),
                     ],
                   ),

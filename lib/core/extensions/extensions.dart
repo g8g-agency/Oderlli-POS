@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import '../utils/currency_formatter.dart';
 
 extension BuildContextX on BuildContext {
   // ── Theme shortcuts ──────────────────────────────────────────────────────
@@ -20,15 +21,25 @@ extension BuildContextX on BuildContext {
 
   bool get isVerticalLayout => screenWidth < 850 || screenWidth < screenHeight;
 
+  /// Returns a grid column count based on defined POS breakpoints.
+  ///
+  /// | Width     | Mode                 |
+  /// |-----------|----------------------|
+  /// | < 700     | Compact portrait     |
+  /// | 700–900   | Tablet narrow        |
+  /// | 900–1200  | Tablet standard      |
+  /// | 1200–1440 | Large tablet/desktop |
+  /// | > 1440    | Desktop wide         |
   int responsiveColumns({
     required int mobile,
     required int tablet,
     required int desktop,
     int? largeDesktop,
   }) {
-    if (screenWidth >= 1400) return largeDesktop ?? desktop;
+    if (screenWidth >= 1440) return largeDesktop ?? desktop;
     if (screenWidth >= 1200) return desktop;
-    if (screenWidth >= 750) return tablet;
+    if (screenWidth >= 900) return tablet;
+    if (screenWidth >= 700) return mobile + 1;
     return mobile;
   }
 
@@ -62,7 +73,11 @@ extension StringX on String {
 }
 
 extension DoubleX on double {
-  String get asCurrency => '£${toStringAsFixed(2)}';
+  /// Formats this value as an Indian Rupee string with lakh/crore grouping.
+  /// Delegates to [CurrencyFormatter.format] — do not hardcode '₹' in widgets.
+  ///
+  /// Example: `125000.5.asCurrency` → `'₹1,25,000.50'`
+  String get asCurrency => CurrencyFormatter.format(this);
 }
 
 extension DateTimeX on DateTime {

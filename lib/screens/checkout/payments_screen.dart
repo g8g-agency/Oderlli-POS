@@ -8,6 +8,7 @@ import '../../theme/theme.dart';
 import '../../widgets/widgets.dart';
 import '../../providers/providers.dart';
 import '../../core/extensions/extensions.dart';
+import '../../core/utils/currency_formatter.dart';
 
 class PaymentsScreen extends ConsumerStatefulWidget {
   const PaymentsScreen({super.key});
@@ -481,7 +482,9 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 ),
                 alignment: Alignment.centerRight,
                 child: Text(
-                  _cashTendered.isEmpty ? '£0.00' : '£$_cashTendered',
+                  _cashTendered.isEmpty
+                      ? '${CurrencyFormatter.symbol}0.00'
+                      : '${CurrencyFormatter.symbol}$_cashTendered',
                   style: AppTextStyles.priceLarge.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w900,
@@ -499,13 +502,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                   ),
                   Gap(8.w),
                   _buildQuickCashButton(
-                    '£20.00',
-                    () => setState(() => _cashTendered = '20.00'),
+                    '${CurrencyFormatter.symbol}200',
+                    () => setState(() => _cashTendered = '200.00'),
                   ),
                   Gap(8.w),
                   _buildQuickCashButton(
-                    '£50.00',
-                    () => setState(() => _cashTendered = '50.00'),
+                    '${CurrencyFormatter.symbol}500',
+                    () => setState(() => _cashTendered = '500.00'),
                   ),
                 ],
               ),
@@ -771,9 +774,9 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
               // Trigger build update to recalculate tendered totals
               setState(() {});
             },
-            decoration: const InputDecoration(
-              prefixText: '£',
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: InputDecoration(
+              prefixText: CurrencyFormatter.symbol,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             ),
             style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.w800),
           ),
