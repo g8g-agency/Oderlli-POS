@@ -296,28 +296,30 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
               icon: Icons.restaurant_menu,
             ),
             Gap(12.h),
-            if (table.status == POSTableStatus.paymentPending) ...[
-              PrimaryButton(
-                onPressed: () {
-                  // Direct route to checkout payments
-                  ref.read(activeTableIdProvider.notifier).state = table.id;
-                  context.go('/checkout');
-                },
-                text: 'PROCEED TO CHECKOUT',
-                icon: Icons.payment,
-              ),
-              Gap(12.h),
-            ] else ...[
-              SecondaryButton(
-                onPressed: () {
-                  // Set billing checkout state
-                  ref.read(posTablesProvider.notifier).updateStatus(table.id, POSTableStatus.paymentPending);
-                  setState(() => _selectedTable = null);
-                },
-                text: 'REQUEST BILL / CHECKOUT',
-                icon: Icons.receipt,
-              ),
-              Gap(12.h),
+            if (ref.read(authProvider).user?.role != UserRole.server) ...[
+              if (table.status == POSTableStatus.paymentPending) ...[
+                PrimaryButton(
+                  onPressed: () {
+                    // Direct route to checkout payments
+                    ref.read(activeTableIdProvider.notifier).state = table.id;
+                    context.go('/checkout');
+                  },
+                  text: 'PROCEED TO CHECKOUT',
+                  icon: Icons.payment,
+                ),
+                Gap(12.h),
+              ] else ...[
+                SecondaryButton(
+                  onPressed: () {
+                    // Set billing checkout state
+                    ref.read(posTablesProvider.notifier).updateStatus(table.id, POSTableStatus.paymentPending);
+                    setState(() => _selectedTable = null);
+                  },
+                  text: 'REQUEST BILL / CHECKOUT',
+                  icon: Icons.receipt,
+                ),
+                Gap(12.h),
+              ],
             ],
             DangerButton(
               onPressed: () async {

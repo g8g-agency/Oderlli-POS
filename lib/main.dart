@@ -6,6 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'routes/app_router.dart';
 import 'theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
+import 'widgets/widgets.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,11 +27,13 @@ void main() async {
   );
 }
 
-class OrderlliApp extends StatelessWidget {
+class OrderlliApp extends ConsumerWidget {
   const OrderlliApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
+
     return ScreenUtilInit(
       // Design canvas matches a 10-inch tablet in landscape
       designSize: const Size(
@@ -40,25 +43,27 @@ class OrderlliApp extends StatelessWidget {
       minTextAdapt: true,
       splitScreenMode: true,
       builder: (context, child) {
-        return MaterialApp.router(
-          title: 'Orderlli POS',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
-          themeMode: ThemeMode.light,
-          routerConfig: appRouter,
-          builder: (context, child) {
-            final mediaQueryData = MediaQuery.of(context);
-            // Clamp text scaling: prevents Windows 125%/150% DPI from
-            // breaking POS layouts while still supporting mild accessibility scaling.
-            final clampedTextScaler = mediaQueryData.textScaler.clamp(
-              minScaleFactor: 0.85,
-              maxScaleFactor: 1.10,
-            );
-            return MediaQuery(
-              data: mediaQueryData.copyWith(textScaler: clampedTextScaler),
-              child: child!,
-            );
-          },
+        return InteractionListener(
+          child: MaterialApp.router(
+            title: 'Orderlli POS',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            themeMode: ThemeMode.light,
+            routerConfig: router,
+            builder: (context, child) {
+              final mediaQueryData = MediaQuery.of(context);
+              // Clamp text scaling: prevents Windows 125%/150% DPI from
+              // breaking POS layouts while still supporting mild accessibility scaling.
+              final clampedTextScaler = mediaQueryData.textScaler.clamp(
+                minScaleFactor: 0.85,
+                maxScaleFactor: 1.10,
+              );
+              return MediaQuery(
+                data: mediaQueryData.copyWith(textScaler: clampedTextScaler),
+                child: child!,
+              );
+            },
+          ),
         );
       },
     );

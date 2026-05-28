@@ -626,7 +626,7 @@ class _PayoutExpenseDialogState extends ConsumerState<_PayoutExpenseDialog> {
                     Gap(20.h),
                     const Divider(color: AppColors.border),
                     Gap(16.h),
-                    // PIN Authorization placeholder
+                    // PIN Authorization
                     Text('Supervisor PIN Authorization *', style: AppTextStyles.titleMedium),
                     Gap(8.h),
                     TextFormField(
@@ -635,9 +635,18 @@ class _PayoutExpenseDialogState extends ConsumerState<_PayoutExpenseDialog> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         prefixIcon: Icon(Icons.lock_outline),
-                        hintText: 'Enter Supervisor PIN (Optional for Demo)',
+                        hintText: 'Enter Supervisor PIN',
                         helperText: 'Required for audit compliance on drawer payout.',
                       ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Supervisor PIN is required';
+                        }
+                        if (value.trim() != '1111') {
+                          return 'Invalid Supervisor PIN';
+                        }
+                        return null;
+                      },
                     ),
                     Gap(24.h),
                     // Actions row
@@ -910,7 +919,7 @@ class _CashDropInDialogState extends ConsumerState<_CashDropInDialog> {
                     Gap(20.h),
                     const Divider(color: AppColors.border),
                     Gap(16.h),
-                    // PIN Authorization placeholder
+                    // PIN Authorization
                     Text('Supervisor PIN Authorization *', style: AppTextStyles.titleMedium),
                     Gap(8.h),
                     TextFormField(
@@ -919,9 +928,18 @@ class _CashDropInDialogState extends ConsumerState<_CashDropInDialog> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         prefixIcon: Icon(Icons.lock_outline),
-                        hintText: 'Enter Supervisor PIN (Optional for Demo)',
+                        hintText: 'Enter Supervisor PIN',
                         helperText: 'Manager override validation for cash drops.',
                       ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Supervisor PIN is required';
+                        }
+                        if (value.trim() != '1111') {
+                          return 'Invalid Supervisor PIN';
+                        }
+                        return null;
+                      },
                     ),
                     Gap(24.h),
                     // Actions row
@@ -1254,6 +1272,9 @@ class _CloseShiftDialogState extends ConsumerState<_CloseShiftDialog> {
     // Call state update
     ref.read(shiftProvider.notifier).closeShift();
 
+    // Log out of the active auth session
+    await ref.read(authProvider.notifier).logout();
+
     // Operational close sequence delay (1.5 seconds)
     await Future.delayed(const Duration(milliseconds: 1500));
 
@@ -1413,8 +1434,18 @@ class _CloseShiftDialogState extends ConsumerState<_CloseShiftDialog> {
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
                           prefixIcon: Icon(Icons.lock_outline),
-                          hintText: 'Enter Supervisor PIN (Optional for Demo)',
+                          hintText: 'Enter Supervisor PIN',
+                          helperText: 'Manager override validation for cash drops.',
                         ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Supervisor PIN is required';
+                          }
+                          if (value.trim() != '1111') {
+                            return 'Invalid Supervisor PIN';
+                          }
+                          return null;
+                        },
                       ),
                       Gap(24.h),
 

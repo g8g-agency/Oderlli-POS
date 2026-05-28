@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../theme/theme.dart';
 import '../../mock/mock_data.dart';
@@ -17,10 +18,16 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final activeOrders = ref.watch(activeOrdersProvider);
     final tables = ref.watch(tablesProvider);
-    final stats = MockData.dashboardStats;
+    final auth = ref.watch(authProvider);
+    final user = auth.user;
+    final role = user?.role ?? UserRole.server;
 
     final occupiedCount =
         tables.where((t) => t.status == TableStatus.occupied).length;
+
+    // Filter active orders based on role mapping
+    final myAssignedOrders = activeOrders.where((o) => o.servedBy == user?.name).toList();
+    final unassignedOrders = activeOrders.where((o) => o.servedBy == null || o.servedBy!.isEmpty).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -42,49 +49,156 @@ class DashboardScreen extends ConsumerWidget {
             slivers: [
               // ── Top bar ─────────────────────────────────────────────────────
               SliverToBoxAdapter(
-                child: _TopBar(),
+                child: _TopBar(user: user),
               ),
               // ── Stats row ────────────────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
                   child: _StatsRow(
-                    stats: stats,
+                    role: role,
                     occupiedCount: occupiedCount,
                     totalTables: tables.length,
                     activeOrders: activeOrders.length,
                   ),
                 ),
               ),
-              // ── Section title ────────────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 8.h),
-                  child: Text(
-                    'Active Orders', 
-                    style: AppTypography.headlineSmall.copyWith(
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2,
+              
+              // ── Manager Quick Operations (Manager Only) ──────────────────────
+              if (role == UserRole.manager)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                    child: _ManagerQuickActions(),
+                  ),
+                ),
+
+              // ── Dynamic Section Lists based on Role ──────────────────────────
+              if (role == UserRole.server) ...[
+                // Server Partitions: My Orders & Service Queue
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 8.h),
+                    child: Text(
+                      'My Assigned Orders (${myAssignedOrders.length})',
+                      style: AppTypography.headlineSmall.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              // ── Active orders grid ───────────────────────────────────────────
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
-                sliver: SliverGrid(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 12.w,
-                    mainAxisSpacing: 12.h,
-                    childAspectRatio: childAspectRatio,
+                if (myAssignedOrders.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.r),
+                      child: const EmptyStateWidget(
+                        icon: Icons.assignment_ind_outlined,
+                        title: 'No Assigned Orders',
+                        description: 'You are not serving any active tables. Select a table from the Floor Plan to start an order.',
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 12.h),
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 12.w,
+                        mainAxisSpacing: 12.h,
+                        childAspectRatio: childAspectRatio,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => _OrderCard(order: myAssignedOrders[index]),
+                        childCount: myAssignedOrders.length,
+                      ),
+                    ),
                   ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => _OrderCard(order: activeOrders[index]),
-                    childCount: activeOrders.length,
+                
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
+                    child: Text(
+                      'Service Queue (Unassigned / Other)',
+                      style: AppTypography.headlineSmall.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                if (unassignedOrders.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.r),
+                      child: const EmptyStateWidget(
+                        icon: Icons.playlist_add_check_circle_outlined,
+                        title: 'Queue Cleared',
+                        description: 'No unassigned orders require floor service at the moment.',
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 12.w,
+                        mainAxisSpacing: 12.h,
+                        childAspectRatio: childAspectRatio,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => _OrderCard(order: unassignedOrders[index]),
+                        childCount: unassignedOrders.length,
+                      ),
+                    ),
+                  ),
+              ] else ...[
+                // Manager & Cashier View: All active orders
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 8.h),
+                    child: Text(
+                      role == UserRole.cashier ? 'Active Billing Queue' : 'Active Orders',
+                      style: AppTypography.headlineSmall.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                ),
+                if (activeOrders.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.r),
+                      child: EmptyStateWidget(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'No Active Orders',
+                        description: role == UserRole.cashier
+                            ? 'All orders are fully checked out. Open Floor Plan to seat guests or New Order to checkout.'
+                            : 'No active orders in the system.',
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 12.w,
+                        mainAxisSpacing: 12.h,
+                        childAspectRatio: childAspectRatio,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => _OrderCard(order: activeOrders[index]),
+                        childCount: activeOrders.length,
+                      ),
+                    ),
+                  ),
+              ],
             ],
           );
         },
@@ -95,9 +209,17 @@ class DashboardScreen extends ConsumerWidget {
 
 // ── Top bar ──────────────────────────────────────────────────────────────────
 
-class _TopBar extends StatelessWidget {
+class _TopBar extends ConsumerWidget {
+  const _TopBar({required this.user});
+
+  final PosUser? user;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final displayName = user?.name ?? 'Alexander';
+    final displayRole = user?.role ?? UserRole.manager;
+    final greeting = ref.watch(greetingProvider);
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
       decoration: const BoxDecoration(
@@ -112,16 +234,52 @@ class _TopBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Good Evening 👋', 
+                  '$greeting, $displayName 👋',
                   style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  'Dashboard', 
-                  style: AppTextStyles.dashboardTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Text(
+                      'Dashboard',
+                      style: AppTextStyles.dashboardTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Gap(12.w),
+                    // Colored Access Chip accent
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 2.h),
+                      decoration: BoxDecoration(
+                        color: displayRole.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(100.r),
+                        border: Border.all(color: displayRole.color.withValues(alpha: 0.24)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6.r,
+                            height: 6.r,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: displayRole.color,
+                            ),
+                          ),
+                          Gap(6.w),
+                          Text(
+                            displayRole.label.toUpperCase(),
+                            style: AppTypography.labelSmall.copyWith(
+                              color: displayRole.color,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 9.sp,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -136,7 +294,20 @@ class _TopBar extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           Gap(16.w),
-          _TopBarAvatar(),
+          GestureDetector(
+            onTap: () {
+              // Click avatar to quickly lock terminal session
+              ref.read(authProvider.notifier).lock();
+              context.go('/login');
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Terminal locked.')),
+              );
+            },
+            child: Tooltip(
+              message: 'Lock Session',
+              child: _TopBarAvatar(user: user),
+            ),
+          ),
         ],
       ),
     );
@@ -144,25 +315,33 @@ class _TopBar extends StatelessWidget {
 }
 
 class _TopBarAvatar extends StatelessWidget {
+  const _TopBarAvatar({required this.user});
+
+  final PosUser? user;
+
   @override
   Widget build(BuildContext context) {
+    final roleColor = user?.role.color ?? AppColors.primary;
+    final initials = user?.initials ?? 'A';
+
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.3),
+          color: roleColor.withValues(alpha: 0.3),
           width: 2.r,
         ),
       ),
       padding: EdgeInsets.all(2.r),
       child: CircleAvatar(
         radius: 16.r,
-        backgroundColor: AppColors.primary,
+        backgroundColor: roleColor,
         child: Text(
-          'A',
+          initials,
           style: AppTypography.titleMedium.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w700,
+            fontSize: 12.sp,
           ),
         ),
       ),
@@ -174,13 +353,13 @@ class _TopBarAvatar extends StatelessWidget {
 
 class _StatsRow extends StatelessWidget {
   const _StatsRow({
-    required this.stats,
+    required this.role,
     required this.occupiedCount,
     required this.totalTables,
     required this.activeOrders,
   });
 
-  final Map<String, dynamic> stats;
+  final UserRole role;
   final int occupiedCount;
   final int totalTables;
   final int activeOrders;
@@ -188,39 +367,52 @@ class _StatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isVertical = context.isVerticalLayout;
+    final stats = MockData.dashboardStats;
 
-    final cards = [
-      MetricTile(
-        label: 'Today\'s Revenue',
-        value: (stats['totalRevenue'] as double).asCurrency,
-        icon: Icons.attach_money,
-        color: AppColors.success,
-      ),
-      MetricTile(
-        label: 'Active Orders',
-        value: '$activeOrders',
-        icon: Icons.receipt_long,
-        color: AppColors.primary,
-      ),
-      MetricTile(
-        label: 'Tables Occupied',
-        value: '$occupiedCount / $totalTables',
-        icon: Icons.table_restaurant,
-        color: AppColors.info,
-      ),
-      MetricTile(
-        label: 'Avg. Order Value',
-        value: (stats['avgOrderValue'] as double).asCurrency,
-        icon: Icons.trending_up,
-        color: AppColors.cash,
-      ),
-    ];
+    final revenueTile = MetricTile(
+      label: 'Today\'s Revenue',
+      value: (stats['totalRevenue'] as double).asCurrency,
+      icon: Icons.currency_rupee,
+      color: AppColors.success,
+    );
+
+    final activeOrdersTile = MetricTile(
+      label: 'Active Orders',
+      value: '$activeOrders',
+      icon: Icons.receipt_long,
+      color: AppColors.primary,
+    );
+
+    final tablesTile = MetricTile(
+      label: 'Tables Occupied',
+      value: '$occupiedCount / $totalTables',
+      icon: Icons.table_restaurant,
+      color: AppColors.info,
+    );
+
+    final aovTile = MetricTile(
+      label: 'Avg. Order Value',
+      value: (stats['avgOrderValue'] as double).asCurrency,
+      icon: Icons.trending_up,
+      color: AppColors.cash,
+    );
+
+    // Filter tiles visible by role permissions
+    final cards = <Widget>[];
+    if (role == UserRole.manager) {
+      cards.addAll([revenueTile, activeOrdersTile, tablesTile, aovTile]);
+    } else if (role == UserRole.cashier) {
+      cards.addAll([revenueTile, activeOrdersTile, tablesTile]);
+    } else {
+      // Server
+      cards.addAll([activeOrdersTile, tablesTile]);
+    }
 
     if (isVertical) {
       return GridView.count(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 2,
+        crossAxisCount: cards.length > 2 ? 2 : cards.length,
         crossAxisSpacing: AppSpacing.sm.w,
         mainAxisSpacing: AppSpacing.sm.h,
         childAspectRatio: 1.8,
@@ -230,14 +422,64 @@ class _StatsRow extends StatelessWidget {
 
     return Row(
       children: [
-        Expanded(child: cards[0]),
-        Gap(AppSpacing.md.w),
-        Expanded(child: cards[1]),
-        Gap(AppSpacing.md.w),
-        Expanded(child: cards[2]),
-        Gap(AppSpacing.md.w),
-        Expanded(child: cards[3]),
+        for (int i = 0; i < cards.length; i++) ...[
+          Expanded(child: cards[i]),
+          if (i < cards.length - 1) Gap(AppSpacing.md.w),
+        ]
       ],
+    );
+  }
+}
+
+// ── Manager Quick Actions Widget ─────────────────────────────────────────────
+
+class _ManagerQuickActions extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return POSCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.admin_panel_settings, color: AppColors.primary, size: 20.sp),
+              Gap(8.w),
+              Text(
+                'Manager Quick Operations',
+                style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          Gap(12.h),
+          Row(
+            children: [
+              Expanded(
+                child: SecondaryButton(
+                  onPressed: () => context.go('/checkout/refund'),
+                  text: 'ISSUE REFUND',
+                  icon: Icons.assignment_return,
+                ),
+              ),
+              Gap(12.w),
+              Expanded(
+                child: SecondaryButton(
+                  onPressed: () => context.go('/shifts'),
+                  text: 'SHIFT CONTROL',
+                  icon: Icons.lock,
+                ),
+              ),
+              Gap(12.w),
+              Expanded(
+                child: SecondaryButton(
+                  onPressed: () => context.go('/settings'),
+                  text: 'SETTINGS',
+                  icon: Icons.settings,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -294,6 +536,24 @@ class _OrderCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (order.servedBy != null && order.servedBy!.isNotEmpty) ...[
+                Gap(8.w),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(4.r),
+                  ),
+                  child: Text(
+                    order.servedBy!,
+                    style: AppTypography.labelSmall.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 8.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ]
             ],
           ),
         ],

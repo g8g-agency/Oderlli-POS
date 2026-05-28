@@ -10,6 +10,8 @@ import '../../core/constants/app_constants.dart';
 import '../../widgets/widgets.dart';
 import '../../providers/providers.dart';
 import '../../core/extensions/extensions.dart';
+import '../../core/utils/role_permissions.dart';
+import '../../models/models.dart';
 
 /// The persistent sidebar + content shell used by all main sections.
 class MainShell extends ConsumerWidget {
@@ -20,18 +22,43 @@ class MainShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isVertical = context.isVerticalLayout;
+    final auth = ref.watch(authProvider);
+    final user = auth.user;
 
     if (isVertical) {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
           backgroundColor: AppColors.sidebarBg,
-          title: Text(
-            'Orderlli POS',
-            style: AppTextStyles.headlineSmall.copyWith(
-              color: AppColors.textPrimary,
-              fontSize: 18.sp,
-            ),
+          title: Row(
+            children: [
+              Text(
+                'Orderlli POS',
+                style: AppTextStyles.headlineSmall.copyWith(
+                  color: AppColors.textPrimary,
+                  fontSize: 18.sp,
+                ),
+              ),
+              const Spacer(),
+              if (user != null) ...[
+                Container(
+                  width: 8.r,
+                  height: 8.r,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: user.role.color,
+                  ),
+                ),
+                Gap(8.w),
+                Text(
+                  '${user.name} • ${user.role.label}',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ],
           ),
           iconTheme: const IconThemeData(color: AppColors.textPrimary),
           elevation: 0,
@@ -68,9 +95,70 @@ class _Sidebar extends ConsumerWidget {
   const _Sidebar({this.isDrawer = false});
   final bool isDrawer;
 
+  Widget _buildSidebarUserProfile(PosUser user) {
+    final roleColor = user.role.color;
+    return Container(
+      height: AppConstants.topBarHeight.h,
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18.r,
+            backgroundColor: roleColor,
+            child: Text(
+              user.initials,
+              style: AppTypography.bodyMedium.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Gap(12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  user.name,
+                  style: AppTypography.titleMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${user.role.label} · ${user.terminalId}',
+                  style: AppTypography.labelSmall.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 10.sp,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).uri.path;
+    final auth = ref.watch(authProvider);
+    final user = auth.user;
+    final role = user?.role ?? UserRole.server;
+
+    // Filter main navigation items
+    final visibleNavItems = _navItems.where((item) {
+      if (item.route == AppRoutes.shifts) {
+        return RolePermissions.canCloseShift(role);
+      }
+      return true;
+    }).toList();
 
     return Container(
       width: isDrawer ? double.infinity : AppConstants.sidebarWidth.w,
@@ -81,13 +169,17 @@ class _Sidebar extends ConsumerWidget {
           final showSpacer = constraints.maxHeight > 560;
           final content = Column(
             children: [
-              // Logo
-              _SidebarLogo(),
+              // Logo or Active User Profile Card
+              if (user != null) ...[
+                _buildSidebarUserProfile(user),
+              ] else ...[
+                _SidebarLogo(),
+              ],
               const Divider(color: AppColors.sidebarDivider, thickness: 1, height: 1),
               Gap(16.h),
 
               // Nav items
-              ..._navItems.map(
+              ...visibleNavItems.map(
                 (item) => _SidebarNavItem(
                   item: item,
                   isActive: location.startsWith(item.route),
@@ -96,15 +188,33 @@ class _Sidebar extends ConsumerWidget {
 
               if (showSpacer) const Spacer() else Gap(20.h),
 
-              // Settings
-              _SidebarNavItem(
-                item: _NavItem(
-                  label: 'Settings',
-                  icon: Icons.settings_outlined,
-                  activeIcon: Icons.settings,
-                  route: AppRoutes.settings,
+              // Settings (Only show if Manager)
+              if (RolePermissions.canManageSettings(role)) ...[
+                _SidebarNavItem(
+                  item: _NavItem(
+                    label: 'Settings',
+                    icon: Icons.settings_outlined,
+                    activeIcon: Icons.settings,
+                    route: AppRoutes.settings,
+                  ),
+                  isActive: location.startsWith(AppRoutes.settings),
                 ),
-                isActive: location.startsWith(AppRoutes.settings),
+                Gap(8.h),
+              ],
+
+              // Lock Terminal Quick Action (For all roles)
+              _SidebarNavItem(
+                item: const _NavItem(
+                  label: 'Lock Terminal',
+                  icon: Icons.lock_outline,
+                  activeIcon: Icons.lock,
+                  route: '/lock',
+                ),
+                isActive: false,
+                onTap: () {
+                  ref.read(authProvider.notifier).lock();
+                  context.go('/login');
+                },
               ),
               Gap(8.h),
 
@@ -147,9 +257,6 @@ class _Sidebar extends ConsumerWidget {
       activeIcon: Icons.receipt_long,
       route: AppRoutes.orders,
     ),
-    // Kitchen KDS nav item removed intentionally.
-    // The KDS screen, route constant, models, enums, and providers are preserved
-    // for future backend integration. Only UI navigation exposure is disabled.
     _NavItem(
       label: 'Shifts',
       icon: Icons.vpn_key_outlined,
@@ -197,10 +304,15 @@ class _SidebarLogo extends StatelessWidget {
 }
 
 class _SidebarNavItem extends StatelessWidget {
-  const _SidebarNavItem({required this.item, required this.isActive});
+  const _SidebarNavItem({
+    required this.item,
+    required this.isActive,
+    this.onTap,
+  });
 
   final _NavItem item;
   final bool isActive;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -211,7 +323,7 @@ class _SidebarNavItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(10.r),
         child: InkWell(
           borderRadius: BorderRadius.circular(10.r),
-          onTap: () {
+          onTap: onTap ?? () {
             context.go(item.route);
             if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
               Navigator.pop(context);

@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/theme.dart';
 import '../../widgets/widgets.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../providers/providers.dart';
+import '../../models/models.dart';
 
-class RefundsScreen extends StatefulWidget {
+class RefundsScreen extends ConsumerStatefulWidget {
   const RefundsScreen({super.key});
 
   @override
-  State<RefundsScreen> createState() => _RefundsScreenState();
+  ConsumerState<RefundsScreen> createState() => _RefundsScreenState();
 }
 
-class _RefundsScreenState extends State<RefundsScreen> {
+class _RefundsScreenState extends ConsumerState<RefundsScreen> {
   String _receiptId = '';
   bool _searched = false;
 
@@ -25,11 +28,61 @@ class _RefundsScreenState extends State<RefundsScreen> {
     }
   }
 
-  void _onRefund() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Refund Successful! Cash drawer opened.'), backgroundColor: AppColors.success),
-    );
-    context.go('/orders');
+  Future<void> _onRefund() async {
+    final auth = ref.read(authProvider);
+    final user = auth.user;
+
+    if (user == null) return;
+
+    bool authorized = false;
+    String authorizedBy = user.name;
+
+    if (user.role == UserRole.manager) {
+      authorized = true;
+    } else {
+      // Cashier requires Manager override PIN (Alexander: 1111)
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => const ManagerOverrideDialog(
+          actionName: 'Approve Billing Refund',
+        ),
+      );
+      if (confirm == true) {
+        authorized = true;
+        authorizedBy = 'Alexander (Manager Override)';
+      }
+    }
+
+    if (authorized) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Refund Successful! Cash drawer opened.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+
+        // Append payout/refund to shift activity log
+        final shift = ref.read(shiftProvider.notifier);
+        shift.addPayout(
+          4230.0,
+          'Refund',
+          'Bill #$_receiptId (Authorized by $authorizedBy)',
+          null,
+        );
+
+        context.go('/orders');
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Permission denied. Manager authorization required.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -104,7 +157,10 @@ class _RefundsScreenState extends State<RefundsScreen> {
                                   ],
                                 ),
                                 Gap(AppSpacing.md.h),
-                                Text('Paid: ${CurrencyFormatter.format(4230.0)} · Date: Today 12:45 PM · Server: Sarah', style: AppTypography.bodySmall),
+                                Text(
+                                  'Paid: ${CurrencyFormatter.format(4230.0)} · Date: Today 12:45 PM · Server: Sarah',
+                                  style: AppTypography.bodySmall,
+                                ),
                                 Gap(AppSpacing.lg.h),
                                 Container(height: 1.h, color: AppColors.border),
                                 Gap(AppSpacing.md.h),
