@@ -28,18 +28,18 @@ abstract final class AppColors {
   // ── Sidebar ─────────────────────────────────────────────────────────────────
   static const Color sidebarBg = Color(0xFFFFFFFF);
   static const Color sidebarSurface = Color(0xFFF8F9FF);
-  static const Color sidebarActive = Color(0xFFFF7A00);
-  static const Color sidebarActiveBg = Color(0xFFFFDBC8); // Stitch primary-fixed
-  static const Color sidebarText = Color(0xFF584235); // Stitch on-surface-variant
+  static const Color sidebarActive = Color(0xFFE31E24);
+  static const Color sidebarActiveBg = Color(0xFFFEE8E9); // Stitch primary-fixed
+  static const Color sidebarText = Color(0xFF1A1C1E); // Stitch on-surface-variant
   static const Color sidebarTextActive = Color(0xFF5C2800); // Stitch on-primary-container
   static const Color sidebarDivider = Color(0xFFE0C0AF); // Stitch outline-variant
 
   // ── Brand / Primary ─────────────────────────────────────────────────────────
   /// Deep Brand Orange/Brown (Stitch primary: #994700)
-  static const Color primary = Color(0xFF994700);
-  static const Color primaryLight = Color(0xFFFF7A00); // Stitch primary-container
-  static const Color primaryDark = Color(0xFF753400); // Stitch on-primary-fixed-variant
-  static const Color primaryContainer = Color(0xFFFF7A00);
+  static const Color primary = Color(0xFFE31E24);
+  static const Color primaryLight = Color(0xFFE31E24); // Stitch primary-container
+  static const Color primaryDark = Color(0xFFB0121A); // Stitch on-primary-fixed-variant
+  static const Color primaryContainer = Color(0xFFE31E24);
 
   // ── Financial colours ────────────────────────────────────────────────────────
   /// Revenue, positive delta, successful payment
@@ -75,7 +75,7 @@ abstract final class AppColors {
   static const Color statusReadyContainer = Color(0xFFDCFCE7);
 
   /// Order delivered to table
-  static const Color statusServed = Color(0xFF6B7280);
+  static const Color statusServed = Color(0xFF6C757D);
   static const Color statusServedContainer = Color(0xFFF3F4F6);
 
   /// Void / cancelled
@@ -116,17 +116,17 @@ abstract final class AppColors {
   // ── Sync States (Stitch request) ───────────────────────────────────────────────
   static const Color syncing = Color(0xFF0EA5E9);
   static const Color reconnecting = Color(0xFFF97316);
-  static const Color offline = Color(0xFF6B7280);
+  static const Color offline = Color(0xFF6C757D);
 
   // ── Text ─────────────────────────────────────────────────────────────────────
   /// Primary readable text (Stitch on-surface: #151c25)
-  static const Color textPrimary = Color(0xFF151C25);
+  static const Color textPrimary = Color(0xFF1A1C1E);
 
   /// Secondary / supporting text (Stitch on-surface-variant: #584235)
-  static const Color textSecondary = Color(0xFF584235);
+  static const Color textSecondary = Color(0xFF1A1C1E);
 
   /// Tertiary / captions, placeholders
-  static const Color textTertiary = Color(0xFF6B7280);
+  static const Color textTertiary = Color(0xFF6C757D);
 
   /// Disabled state text
   static const Color textDisabled = Color(0xFF9CA3AF);
@@ -140,7 +140,7 @@ abstract final class AppColors {
   // ── Borders & dividers ───────────────────────────────────────────────────────
   static const Color border = Color(0xFF8C7263); // Stitch outline: #8c7263
   static const Color borderSubtle = Color(0xFFE0C0AF); // Stitch outline-variant: #e0c0af
-  static const Color borderFocus = Color(0xFFFF7A00);
+  static const Color borderFocus = Color(0xFFE31E24);
   static const Color divider = Color(0xFFDEE0E2); // Stitch secondary-container: #dee0e2
 
   // ── Shadows ──────────────────────────────────────────────────────────────────
