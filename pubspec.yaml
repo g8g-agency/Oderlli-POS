@@ -38,6 +38,12 @@ dependencies:
   # Local persistence
   shared_preferences: ^2.2.3
 
+  # Network & Secure Auth integrations
+  dio: ^5.7.0
+  flutter_secure_storage: ^9.2.4
+  uuid: ^4.5.1
+  connectivity_plus: ^6.1.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

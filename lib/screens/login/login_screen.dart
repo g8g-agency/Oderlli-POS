@@ -278,9 +278,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         }
       } else {
         if (mounted) {
+          // Read updated state for potential backend error messages
+          final updatedAuth = ref.read(authProvider);
           setState(() {
             _isError = true;
-            _feedbackText = 'Incorrect PIN. Please try again.';
+            _feedbackText = updatedAuth.errorMessage ?? 'Incorrect PIN. Please try again.';
             _pin = '';
           });
           _shakeController.forward(from: 0);

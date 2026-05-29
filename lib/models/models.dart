@@ -9,3 +9,5 @@ export 'shift_transaction_type.dart';
 export 'shift_activity.dart';
 export 'shift_session.dart';
 export 'pos_user.dart';
+export 'auth_session.dart';
+

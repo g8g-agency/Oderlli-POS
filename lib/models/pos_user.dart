@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import 'auth_session.dart';
 
 /// Roles defining permissions in the Orderlli POS.
 enum UserRole {
@@ -36,6 +37,8 @@ class PosUser {
     required this.role,
     required this.pin,
     required this.terminalId,
+    this.email,
+    this.permissions = const [],
   });
 
   final String id;
@@ -43,6 +46,8 @@ class PosUser {
   final UserRole role;
   final String pin;
   final String terminalId;
+  final String? email;
+  final List<String> permissions;
 
   String get initials {
     if (name.isEmpty) return '?';
@@ -60,6 +65,8 @@ class PosUser {
         'role': role.name,
         'pin': pin,
         'terminalId': terminalId,
+        'email': email,
+        'permissions': permissions,
       };
 
   factory PosUser.fromJson(Map<String, dynamic> json) => PosUser(
@@ -68,9 +75,33 @@ class PosUser {
         role: UserRole.values.byName(json['role'] as String),
         pin: json['pin'] as String,
         terminalId: json['terminalId'] as String,
+        email: json['email'] as String?,
+        permissions: (json['permissions'] as List<dynamic>?)?.map((e) => e as String).toList() ?? const [],
       );
 
-  /// Mock users database
+  factory PosUser.fromBackendUser(BackendUser backendUser) {
+    UserRole mappedRole;
+    final r = backendUser.role.toUpperCase();
+    if (r == 'MANAGER' || r == 'RESTAURANT_ADMIN' || r == 'SUPER_ADMIN') {
+      mappedRole = UserRole.manager;
+    } else if (r == 'CASHIER') {
+      mappedRole = UserRole.cashier;
+    } else {
+      mappedRole = UserRole.server;
+    }
+
+    return PosUser(
+      id: backendUser.id,
+      name: backendUser.fullName,
+      role: mappedRole,
+      pin: '', // Pin not stored in plain text user model
+      terminalId: 'Main Terminal',
+      email: backendUser.email,
+      permissions: backendUser.permissions,
+    );
+  }
+
+  /// Mock users database with associated emails
   static const List<PosUser> mockUsers = [
     PosUser(
       id: 'usr-alexander',
@@ -78,6 +109,7 @@ class PosUser {
       role: UserRole.manager,
       pin: '1111',
       terminalId: 'Terminal 1',
+      email: 'alexander@orderlli.com',
     ),
     PosUser(
       id: 'usr-sarah',
@@ -85,6 +117,7 @@ class PosUser {
       role: UserRole.cashier,
       pin: '2222',
       terminalId: 'Front Counter',
+      email: 'sarah@orderlli.com',
     ),
     PosUser(
       id: 'usr-michael',
@@ -92,6 +125,7 @@ class PosUser {
       role: UserRole.cashier,
       pin: '3333',
       terminalId: 'Bar Terminal',
+      email: 'michael@orderlli.com',
     ),
     PosUser(
       id: 'usr-jessica',
@@ -99,6 +133,7 @@ class PosUser {
       role: UserRole.server,
       pin: '4444',
       terminalId: 'Floor Service',
+      email: 'jessica@orderlli.com',
     ),
   ];
 }
