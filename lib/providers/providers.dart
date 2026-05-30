@@ -8,3 +8,4 @@ export 'pos_alerts_provider.dart';
 export 'shift_provider.dart';
 export 'auth_provider.dart';
 export 'greeting_provider.dart';
+export '../features/kitchen/providers/kitchen_provider.dart';

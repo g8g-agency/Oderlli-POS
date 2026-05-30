@@ -1,167 +1,101 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 
 import '../../core/extensions/extensions.dart';
-import '../../mock/mock_data.dart';
-import '../../models/order.dart';
+import '../../features/kitchen/models/kitchen_item.dart';
+import '../../features/kitchen/models/kitchen_item_status.dart';
+import '../../features/kitchen/models/kitchen_ticket.dart';
+import '../../features/kitchen/models/kitchen_ticket_status.dart';
+import '../../features/kitchen/providers/kitchen_provider.dart';
 import '../../theme/theme.dart';
 import '../../widgets/widgets.dart';
 
 // ─── SLA thresholds (minutes) ─────────────────────────────────────────────────
-const int _slaWarning = 20;  // amber  — approaching breach
-const int _slaCritical = 25; // red    — SLA breached
+const int _slaWarning = 10;  // amber  — approaching breach
+const int _slaCritical = 20; // red    — SLA breached
 
 // ─── View filter ─────────────────────────────────────────────────────────────
 enum _KdsView { all, preparing, delayed, ready }
 
 // ─── Kitchen screen ───────────────────────────────────────────────────────────
-class KitchenScreen extends StatefulWidget {
+class KitchenScreen extends ConsumerStatefulWidget {
   const KitchenScreen({super.key});
 
   @override
-  State<KitchenScreen> createState() => _KitchenScreenState();
+  ConsumerState<KitchenScreen> createState() => _KitchenScreenState();
 }
 
-class _KitchenScreenState extends State<KitchenScreen> {
-  late List<_KdsTicket> _tickets;
-  Timer? _ticker;
+class _KitchenScreenState extends ConsumerState<KitchenScreen> {
+  Timer? _clockTicker;
+  Timer? _refreshTimer;
   _KdsView _currentView = _KdsView.all;
   DateTime _now = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _tickets = _buildTickets();
     // Tick every second so elapsed times update live
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+    _clockTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _now = DateTime.now());
     });
-  }
-
-  @override
-  void dispose() {
-    _ticker?.cancel();
-    super.dispose();
-  }
-
-  // ── Build mock tickets from mock orders ────────────────────────────────────
-  List<_KdsTicket> _buildTickets() {
-    final orders = MockData.orders;
-    final kitchenOrders = orders
-        .where((o) =>
-            o.status == OrderStatus.pending ||
-            o.status == OrderStatus.preparing ||
-            o.status == OrderStatus.ready)
-        .toList();
-
-    // Also add a couple of extra hard-coded delayed tickets for demo richness
-    return [
-      ...kitchenOrders.map((o) => _KdsTicket.fromOrder(o)),
-      _KdsTicket(
-        id: 'ord-demo-1',
-        tableNumber: 6,
-        section: 'Terrace',
-        status: OrderStatus.preparing,
-        createdAt: DateTime.now().subtract(const Duration(minutes: 27)),
-        servedBy: 'Marco',
-        items: [
-          _KdsItem(name: 'BBQ Ribs Half-Rack', qty: 2, notes: 'Extra sauce'),
-          _KdsItem(name: 'Garlic Bread', qty: 2),
-          _KdsItem(name: 'House Red Wine (Glass)', qty: 2),
-        ],
-        priority: _TicketPriority.critical,
-      ),
-      _KdsTicket(
-        id: 'ord-demo-2',
-        tableNumber: 11,
-        section: 'Terrace',
-        status: OrderStatus.pending,
-        createdAt: DateTime.now().subtract(const Duration(minutes: 3)),
-        servedBy: 'Sara',
-        items: [
-          _KdsItem(name: 'Tiramisu', qty: 2),
-          _KdsItem(name: 'Espresso', qty: 2, notes: 'Double shot'),
-        ],
-        priority: _TicketPriority.normal,
-      ),
-      _KdsTicket(
-        id: 'ord-demo-3',
-        tableNumber: 5,
-        section: 'Indoor',
-        status: OrderStatus.ready,
-        createdAt: DateTime.now().subtract(const Duration(minutes: 22)),
-        servedBy: 'Lena',
-        items: [
-          _KdsItem(name: 'Mushroom Risotto', qty: 1),
-          _KdsItem(name: 'Margherita Pizza', qty: 1),
-          _KdsItem(name: 'Sparkling Water (500ml)', qty: 2),
-        ],
-        priority: _TicketPriority.warning,
-      ),
-    ];
-  }
-
-  // ── Derived lists ─────────────────────────────────────────────────────────
-  List<_KdsTicket> get _preparing =>
-      _tickets.where((t) => t.status == OrderStatus.preparing).toList();
-
-  List<_KdsTicket> get _pending =>
-      _tickets.where((t) => t.status == OrderStatus.pending).toList();
-
-  List<_KdsTicket> get _ready =>
-      _tickets.where((t) => t.status == OrderStatus.ready).toList();
-
-  List<_KdsTicket> get _delayed => _tickets
-      .where((t) =>
-          t.status != OrderStatus.ready &&
-          _elapsedMinutes(t) >= _slaWarning)
-      .toList();
-
-  int _elapsedMinutes(_KdsTicket t) =>
-      _now.difference(t.createdAt).inMinutes;
-
-  List<_KdsTicket> get _filtered {
-    switch (_currentView) {
-      case _KdsView.all:
-        return _tickets;
-      case _KdsView.preparing:
-        return _preparing;
-      case _KdsView.delayed:
-        return _delayed;
-      case _KdsView.ready:
-        return _ready;
-    }
-  }
-
-  // ── Bump ticket to next status ─────────────────────────────────────────────
-  void _bumpTicket(_KdsTicket ticket) {
-    setState(() {
-      final idx = _tickets.indexWhere((t) => t.id == ticket.id);
-      if (idx < 0) return;
-      final next = switch (ticket.status) {
-        OrderStatus.pending => OrderStatus.preparing,
-        OrderStatus.preparing => OrderStatus.ready,
-        OrderStatus.ready => OrderStatus.served,
-        _ => ticket.status,
-      };
-      if (next == OrderStatus.served) {
-        _tickets.removeAt(idx);
-      } else {
-        _tickets[idx] = ticket.copyWith(status: next);
+    // Auto-refresh from backend every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        ref.read(kitchenProvider.notifier).refreshTickets();
       }
     });
   }
 
   @override
+  void dispose() {
+    _clockTicker?.cancel();
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  // ── Derived filter from view ───────────────────────────────────────────────
+  int _elapsedMinutes(KitchenTicket t) {
+    // Prefer server-reported elapsedSeconds; fall back to local clock diff
+    if (t.elapsedSeconds > 0) return t.elapsedSeconds ~/ 60;
+    return _now.difference(t.createdAt).inMinutes;
+  }
+
+  List<KitchenTicket> _applyViewFilter(List<KitchenTicket> tickets) {
+    return switch (_currentView) {
+      _KdsView.all => tickets,
+      _KdsView.preparing =>
+        tickets.where((t) => t.status == KitchenTicketStatus.preparing).toList(),
+      _KdsView.delayed => tickets
+          .where((t) =>
+              t.status != KitchenTicketStatus.ready && _elapsedMinutes(t) >= _slaWarning)
+          .toList(),
+      _KdsView.ready =>
+        tickets.where((t) => t.status == KitchenTicketStatus.ready).toList(),
+    };
+  }
+
+  // ── Bump ticket to next FSM status ────────────────────────────────────────
+  void _bumpTicket(KitchenTicket ticket) {
+    final nextStatus = kNextTicketStatus[ticket.status];
+    if (nextStatus == null) return;
+    ref.read(kitchenProvider.notifier).bumpTicket(ticket.ticketId, nextStatus);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final preparingCount = _preparing.length;
-    final pendingCount = _pending.length;
-    final readyCount = _ready.length;
-    final delayedCount = _delayed.length;
-    final totalActive = _tickets.length;
+    final kitchenState = ref.watch(kitchenProvider);
+    final allActive = kitchenState.activeTickets;
+    final filtered = _applyViewFilter(allActive);
+
+    final preparingCount = allActive.where((t) => t.status == KitchenTicketStatus.preparing).length;
+    final pendingCount = allActive.where((t) => t.status == KitchenTicketStatus.pending).length;
+    final readyCount = allActive.where((t) => t.status == KitchenTicketStatus.ready).length;
+    final delayedCount = allActive.where((t) => _elapsedMinutes(t) >= _slaWarning).length;
+    final totalActive = allActive.length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -177,13 +111,71 @@ class _KitchenScreenState extends State<KitchenScreen> {
             currentView: _currentView,
             onViewChanged: (v) => setState(() => _currentView = v),
             now: _now,
+            isRefreshing: kitchenState.isLoading,
+            onRefresh: () => ref.read(kitchenProvider.notifier).refreshTickets(),
           ),
+
+          // ── Error banner ───────────────────────────────────────────────────
+          if (kitchenState.error != null && allActive.isEmpty)
+            _buildErrorBanner(kitchenState.error!),
 
           // ── Content ────────────────────────────────────────────────────────
           Expanded(
-            child: _filtered.isEmpty
-                ? _buildEmptyState()
-                : _buildTicketGrid(_filtered),
+            child: kitchenState.isLoading && allActive.isEmpty
+                ? _buildLoadingState()
+                : filtered.isEmpty
+                    ? _buildEmptyState()
+                    : _buildTicketGrid(filtered),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(String error) {
+    return Container(
+      width: double.infinity,
+      color: AppColors.errorContainer,
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg.w,
+        vertical: AppSpacing.xs.h,
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.wifi_off_rounded, size: 16.sp, color: AppColors.error),
+          Gap(AppSpacing.xs.w),
+          Expanded(
+            child: Text(
+              'Unable to reach server — showing cached data',
+              style: AppTypography.labelMedium.copyWith(color: AppColors.error),
+            ),
+          ),
+          TextButton(
+            onPressed: () => ref.read(kitchenProvider.notifier).loadTickets(),
+            child: Text('Retry', style: AppTypography.labelMedium.copyWith(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 40.w,
+            height: 40.h,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              color: AppColors.primary,
+            ),
+          ),
+          Gap(AppSpacing.md.h),
+          Text(
+            'Loading kitchen queue…',
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -211,7 +203,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
     );
   }
 
-  Widget _buildTicketGrid(List<_KdsTicket> tickets) {
+  Widget _buildTicketGrid(List<KitchenTicket> tickets) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
@@ -257,6 +249,8 @@ class _KdsTopBar extends StatelessWidget {
     required this.currentView,
     required this.onViewChanged,
     required this.now,
+    required this.isRefreshing,
+    required this.onRefresh,
   });
 
   final int preparingCount;
@@ -267,6 +261,8 @@ class _KdsTopBar extends StatelessWidget {
   final _KdsView currentView;
   final ValueChanged<_KdsView> onViewChanged;
   final DateTime now;
+  final bool isRefreshing;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -293,7 +289,6 @@ class _KdsTopBar extends StatelessWidget {
             child: Row(
               children: [
                 if (!isVertical) ...[
-                  // KDS icon
                   Container(
                     width: 40.w,
                     height: 40.h,
@@ -320,6 +315,22 @@ class _KdsTopBar extends StatelessWidget {
                   ],
                 ),
                 const Spacer(),
+                // Refresh button
+                IconButton(
+                  icon: isRefreshing
+                      ? SizedBox(
+                          width: 18.w,
+                          height: 18.h,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : Icon(Icons.refresh_rounded, size: 20.sp, color: AppColors.textSecondary),
+                  onPressed: isRefreshing ? null : onRefresh,
+                  tooltip: 'Refresh queue',
+                ),
+                Gap(AppSpacing.xs.w),
                 // Live clock
                 Container(
                   padding: EdgeInsets.symmetric(
@@ -349,7 +360,6 @@ class _KdsTopBar extends StatelessWidget {
                   ),
                 ),
                 Gap(isVertical ? AppSpacing.xs.w : AppSpacing.sm.w),
-                // Connection status
                 const StatusChip(label: 'LIVE', color: AppColors.success),
               ],
             ),
@@ -480,63 +490,70 @@ class _KdsTicketCard extends StatelessWidget {
     required this.onBump,
   });
 
-  final _KdsTicket ticket;
+  final KitchenTicket ticket;
   final int elapsed;
   final VoidCallback onBump;
 
   Color get _slaColor {
-    if (ticket.status == OrderStatus.ready) return AppColors.statusReady;
+    if (ticket.status == KitchenTicketStatus.ready) return AppColors.statusReady;
     if (elapsed >= _slaCritical) return AppColors.error;
     if (elapsed >= _slaWarning) return AppColors.warning;
     return AppColors.statusPreparing;
   }
 
   Color get _headerBg {
-    if (ticket.status == OrderStatus.ready) return AppColors.statusReadyContainer;
+    if (ticket.status == KitchenTicketStatus.ready) return AppColors.statusReadyContainer;
     if (elapsed >= _slaCritical) return AppColors.errorContainer;
     if (elapsed >= _slaWarning) return AppColors.warningContainer;
-    if (ticket.status == OrderStatus.preparing) return AppColors.statusPreparingContainer;
+    if (ticket.status == KitchenTicketStatus.preparing) return AppColors.statusPreparingContainer;
     return AppColors.statusPendingContainer;
   }
 
   String get _statusLabel {
-    if (ticket.status == OrderStatus.ready) return 'READY';
-    if (elapsed >= _slaCritical) return 'OVERDUE';
+    if (ticket.status == KitchenTicketStatus.ready) return 'READY';
+    if (ticket.isOverdue || elapsed >= _slaCritical) return 'OVERDUE';
     if (elapsed >= _slaWarning) return 'DELAYED';
-    if (ticket.status == OrderStatus.preparing) return 'PREPARING';
+    if (ticket.status == KitchenTicketStatus.preparing) return 'PREPARING';
+    if (ticket.status == KitchenTicketStatus.accepted) return 'ACCEPTED';
     return 'PENDING';
   }
 
   String get _bumpLabel {
     return switch (ticket.status) {
-      OrderStatus.pending => 'START PREPARING',
-      OrderStatus.preparing => 'MARK READY',
-      OrderStatus.ready => 'SERVE & CLEAR',
-      _ => 'DONE',
+      KitchenTicketStatus.pending => 'START PREPARING',
+      KitchenTicketStatus.accepted => 'START PREPARING',
+      KitchenTicketStatus.preparing => 'MARK READY',
+      KitchenTicketStatus.ready => 'SERVE & CLEAR',
+      KitchenTicketStatus.delivered => 'DONE',
     };
   }
 
   IconData get _bumpIcon {
     return switch (ticket.status) {
-      OrderStatus.pending => Icons.play_arrow_rounded,
-      OrderStatus.preparing => Icons.done_all_rounded,
-      OrderStatus.ready => Icons.delivery_dining_rounded,
-      _ => Icons.check_rounded,
+      KitchenTicketStatus.pending || KitchenTicketStatus.accepted =>
+        Icons.play_arrow_rounded,
+      KitchenTicketStatus.preparing => Icons.done_all_rounded,
+      KitchenTicketStatus.ready => Icons.delivery_dining_rounded,
+      KitchenTicketStatus.delivered => Icons.check_rounded,
     };
   }
 
   Color get _bumpColor {
     return switch (ticket.status) {
-      OrderStatus.pending => AppColors.primary,
-      OrderStatus.preparing => AppColors.statusPreparing,
-      OrderStatus.ready => AppColors.statusReady,
-      _ => AppColors.primary,
+      KitchenTicketStatus.pending || KitchenTicketStatus.accepted =>
+        AppColors.primary,
+      KitchenTicketStatus.preparing => AppColors.statusPreparing,
+      KitchenTicketStatus.ready => AppColors.statusReady,
+      KitchenTicketStatus.delivered => AppColors.primary,
     };
   }
 
+  bool get _canBump => ticket.status != KitchenTicketStatus.delivered;
+
   @override
   Widget build(BuildContext context) {
-    final isCritical = elapsed >= _slaCritical && ticket.status != OrderStatus.ready;
+    final isCritical = (elapsed >= _slaCritical || ticket.isOverdue) &&
+        ticket.status != KitchenTicketStatus.ready;
     final elapsedStr = elapsed >= 60
         ? '${elapsed ~/ 60}h ${elapsed % 60}m'
         : '${elapsed}m';
@@ -549,7 +566,7 @@ class _KdsTicketCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Card header ────────────────────────────────────────────────────
+            // ── Card header ──────────────────────────────────────────────────
             Container(
               padding: EdgeInsets.symmetric(
                 horizontal: AppSpacing.md.w,
@@ -589,19 +606,11 @@ class _KdsTicketCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          ticket.section,
+                          ticket.orderNumber,
                           style: AppTypography.labelSmall.copyWith(
                             color: AppColors.textTertiary,
                           ),
                         ),
-                        if (ticket.servedBy != null)
-                          Text(
-                            ticket.servedBy!,
-                            style: AppTypography.labelMedium.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
                       ],
                     ),
                   ),
@@ -611,12 +620,17 @@ class _KdsTicketCard extends StatelessWidget {
               ),
             ),
 
-            // ── Divider ────────────────────────────────────────────────────────
+            // ── Divider ──────────────────────────────────────────────────────
             Container(height: 1, color: AppColors.border),
 
-            // ── SLA timer bar ──────────────────────────────────────────────────
+            // ── SLA timer bar ─────────────────────────────────────────────
             Padding(
-              padding: EdgeInsets.fromLTRB(AppSpacing.md.w, AppSpacing.xs.h, AppSpacing.md.w, AppSpacing.xxs.h),
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.md.w,
+                AppSpacing.xs.h,
+                AppSpacing.md.w,
+                AppSpacing.xxs.h,
+              ),
               child: _SlaTimerRow(
                 elapsed: elapsed,
                 elapsedStr: elapsedStr,
@@ -627,7 +641,7 @@ class _KdsTicketCard extends StatelessWidget {
 
             Container(height: 1, color: AppColors.borderSubtle),
 
-            // ── Items list ─────────────────────────────────────────────────────
+            // ── Items list ────────────────────────────────────────────────
             Expanded(
               child: ListView.separated(
                 padding: EdgeInsets.all(AppSpacing.sm.r),
@@ -643,11 +657,11 @@ class _KdsTicketCard extends StatelessWidget {
 
             Container(height: 1, color: AppColors.border),
 
-            // ── Action button ──────────────────────────────────────────────────
+            // ── Action button ─────────────────────────────────────────────
             Padding(
               padding: EdgeInsets.all(AppSpacing.sm.r),
               child: PrimaryButton(
-                onPressed: onBump,
+                onPressed: _canBump ? onBump : null,
                 text: _bumpLabel,
                 icon: _bumpIcon,
                 backgroundColor: _bumpColor,
@@ -730,11 +744,14 @@ class _SlaTimerRow extends StatelessWidget {
 class _KdsItemRow extends StatelessWidget {
   const _KdsItemRow({required this.item, required this.slaColor});
 
-  final _KdsItem item;
+  final KitchenItem item;
   final Color slaColor;
 
   @override
   Widget build(BuildContext context) {
+    final isDone = item.status == KitchenItemStatus.completed ||
+        item.status == KitchenItemStatus.cancelled;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -747,25 +764,55 @@ class _KdsItemRow extends StatelessWidget {
               height: 22.h,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: AppColors.primaryContainer,
+                color: isDone
+                    ? AppColors.surfaceVariant
+                    : AppColors.primaryContainer,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusXS.r),
               ),
               child: Text(
-                '${item.qty}×',
+                '${item.quantity}×',
                 style: AppTypography.labelMedium.copyWith(
-                  color: AppColors.primary,
+                  color: isDone ? AppColors.textTertiary : AppColors.primary,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
             Gap(AppSpacing.xs.w),
             Expanded(
-              child: Text(
-                item.name,
-                style: AppTypography.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w600,
-                  height: 1.3,
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.name,
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
+                        color: isDone ? AppColors.textTertiary : null,
+                        decoration: isDone ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                  ),
+                  if (item.stationName != null) ...[
+                    Gap(AppSpacing.xs.w),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xxs.w,
+                        vertical: 2.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusXS.r),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Text(
+                        item.stationName!,
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -794,67 +841,4 @@ class _KdsItemRow extends StatelessWidget {
       ],
     );
   }
-}
-
-
-
-// ─── Data models ──────────────────────────────────────────────────────────────
-enum _TicketPriority { normal, warning, critical }
-
-class _KdsItem {
-  const _KdsItem({required this.name, required this.qty, this.notes});
-  final String name;
-  final int qty;
-  final String? notes;
-}
-
-class _KdsTicket {
-  const _KdsTicket({
-    required this.id,
-    required this.tableNumber,
-    required this.section,
-    required this.status,
-    required this.createdAt,
-    required this.items,
-    this.servedBy,
-    this.priority = _TicketPriority.normal,
-  });
-
-  final String id;
-  final int tableNumber;
-  final String section;
-  final OrderStatus status;
-  final DateTime createdAt;
-  final List<_KdsItem> items;
-  final String? servedBy;
-  final _TicketPriority priority;
-
-  factory _KdsTicket.fromOrder(Order order) {
-    return _KdsTicket(
-      id: order.id,
-      tableNumber: order.tableNumber,
-      section: 'Indoor',
-      status: order.status,
-      createdAt: order.createdAt,
-      servedBy: order.servedBy,
-      items: order.items
-          .map((oi) => _KdsItem(
-                name: oi.menuItem.name,
-                qty: oi.quantity,
-                notes: oi.notes,
-              ))
-          .toList(),
-    );
-  }
-
-  _KdsTicket copyWith({OrderStatus? status}) => _KdsTicket(
-        id: id,
-        tableNumber: tableNumber,
-        section: section,
-        status: status ?? this.status,
-        createdAt: createdAt,
-        items: items,
-        servedBy: servedBy,
-        priority: priority,
-      );
 }
