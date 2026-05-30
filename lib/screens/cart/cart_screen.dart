@@ -46,7 +46,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Widget build(BuildContext context) {
     final cartState = ref.watch(posCartProvider);
     final selectedTableId = ref.watch(cartSelectedTableProvider);
-    final tables = ref.watch(posTablesProvider);
+    final tables = ref.watch(posTablesProvider).valueOrNull ?? [];
 
     // If activeTableIdProvider from Floor Plan is set, pre-fill selectedTableId
     final floorSelectedTableId = ref.watch(activeTableIdProvider);
@@ -56,9 +56,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       }
     });
 
-    final currentSelectedTable = selectedTableId != null
-        ? tables.firstWhere((t) => t.id == selectedTableId, orElse: () => tables.first)
-        : tables.firstWhere((t) => t.status == POSTableStatus.occupied || t.status == POSTableStatus.preparing, orElse: () => tables.first);
+    final TableModel? currentSelectedTable = tables.isEmpty
+        ? null
+        : (selectedTableId != null
+            ? tables.firstWhere((t) => t.id == selectedTableId, orElse: () => tables.first)
+            : tables.firstWhere((t) => t.status == POSTableStatus.occupied || t.status == POSTableStatus.preparing, orElse: () => tables.first));
 
     final isVertical = context.isVerticalLayout;
 
@@ -136,27 +138,33 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 children: [
                   Text('Table Mapping', style: AppTextStyles.titleMedium),
                   Gap(12.h),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedTableId ?? currentSelectedTable.id,
-                    dropdownColor: AppColors.surfaceElevated,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.table_restaurant_outlined),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  if (tables.isEmpty)
+                    Text(
+                      'No tables configured for this branch',
+                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedTableId ?? currentSelectedTable?.id,
+                      dropdownColor: AppColors.surfaceElevated,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.table_restaurant_outlined),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                      ),
+                      items: tables.map((t) {
+                        return DropdownMenuItem<String>(
+                          value: t.id,
+                          child: Text(
+                            'Table ${t.number} (${t.status.label})',
+                            style: AppTextStyles.bodyMedium,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        ref.read(cartSelectedTableProvider.notifier).state = val;
+                      },
                     ),
-                    items: tables.map((t) {
-                      return DropdownMenuItem<String>(
-                        value: t.id,
-                        child: Text(
-                          'Table ${t.number} (${t.status.label})',
-                          style: AppTextStyles.bodyMedium,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      ref.read(cartSelectedTableProvider.notifier).state = val;
-                    },
-                  ),
-                  if (currentSelectedTable.waiterName != null) ...[
+                  if (currentSelectedTable != null && currentSelectedTable.waiterName != null) ...[
                     Gap(10.h),
                     Row(
                       children: [
@@ -232,40 +240,47 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
                             if (!mounted) return;
 
-                            // Dispatch Order to Kitchen
-                            final selectedTable = currentSelectedTable;
+                             // Dispatch Order to Kitchen
+                             final selectedTable = currentSelectedTable;
+                             if (selectedTable == null) {
+                               setState(() {
+                                 _isSending = false;
+                               });
+                               this.context.showErrorSnack('No table selected.');
+                               return;
+                             }
 
-                            final newOrder = Order(
-                              id: 'ord-${DateTime.now().millisecondsSinceEpoch}',
-                              tableId: selectedTable.id,
-                              tableNumber: selectedTable.number,
-                              status: OrderStatus.preparing,
-                              createdAt: DateTime.now(),
-                              discountPercent: cartState.discountPercent,
-                              taxPercent: cartState.taxPercent,
-                              servedBy: selectedTable.waiterName ?? 'Sarah',
-                              items: cartState.items.map((c) {
-                                return OrderItem(
-                                  id: 'oi-${DateTime.now().millisecondsSinceEpoch}-${c.menuItem.id}',
-                                  menuItem: c.menuItem,
-                                  quantity: c.qty,
-                                  notes: c.notes,
-                                  modifiers: c.selectedModifiers,
-                                );
-                              }).toList(),
-                            );
+                             final newOrder = Order(
+                               id: 'ord-${DateTime.now().millisecondsSinceEpoch}',
+                               tableId: selectedTable.id,
+                               tableNumber: selectedTable.number,
+                               status: OrderStatus.preparing,
+                               createdAt: DateTime.now(),
+                               discountPercent: cartState.discountPercent,
+                               taxPercent: cartState.taxPercent,
+                               servedBy: selectedTable.waiterName ?? 'Sarah',
+                               items: cartState.items.map((c) {
+                                 return OrderItem(
+                                   id: 'oi-${DateTime.now().millisecondsSinceEpoch}-${c.menuItem.id}',
+                                   menuItem: c.menuItem,
+                                   quantity: c.qty,
+                                   notes: c.notes,
+                                   modifiers: c.selectedModifiers,
+                                 );
+                               }).toList(),
+                             );
 
-                            // Add order
-                            ref.read(ordersProvider.notifier).addOrder(newOrder);
+                             // Add order
+                             ref.read(ordersProvider.notifier).addOrder(newOrder);
 
-                            // Update table to occupied/preparing
-                            ref.read(posTablesProvider.notifier).seatTable(
-                                  selectedTable.id,
-                                  selectedTable.guestCount > 0 ? selectedTable.guestCount : 2,
-                                  selectedTable.waiterName ?? 'Sarah',
-                                );
-                            ref.read(posTablesProvider.notifier).updateStatus(selectedTable.id, POSTableStatus.preparing);
-                            ref.read(posTablesProvider.notifier).updateBill(selectedTable.id, cartState.total);
+                             // Update table to occupied/preparing (noop in read-only API mode)
+                             ref.read(posTablesProvider.notifier).seatTable(
+                                   selectedTable.id,
+                                   selectedTable.guestCount > 0 ? selectedTable.guestCount : 2,
+                                   selectedTable.waiterName ?? 'Sarah',
+                                 );
+                             ref.read(posTablesProvider.notifier).updateStatus(selectedTable.id, POSTableStatus.preparing);
+                             ref.read(posTablesProvider.notifier).updateBill(selectedTable.id, cartState.total);
 
                             // Reset selected table contexts
                             ref.read(cartSelectedTableProvider.notifier).state = null;

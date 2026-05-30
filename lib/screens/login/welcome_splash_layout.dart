@@ -24,11 +24,11 @@ class WelcomeSplashLayout extends StatelessWidget {
               width: 384,
               height: 384,
               decoration: BoxDecoration(
-                color: brandRed.withOpacity(0.05),
+                color: brandRed.withValues(alpha: 0.05),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: brandRed.withOpacity(0.05),
+                    color: brandRed.withValues(alpha: 0.05),
                     blurRadius: 100,
                   ),
                 ],
@@ -158,7 +158,7 @@ class WelcomeSplashLayout extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 elevation: 8,
-                                shadowColor: brandRed.withOpacity(0.4),
+                                shadowColor: brandRed.withValues(alpha: 0.4),
                               ),
                               child: Text(
                                 'Login / Sign In',
@@ -194,7 +194,7 @@ class WelcomeSplashLayout extends StatelessWidget {
   Widget _buildFeatureCard(IconData icon, String label, bool isDark, Color brandRed) {
     return Container(
       width: 110,
-      height: 110,
+      height: 125,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2E3132) : Colors.white,
@@ -202,7 +202,7 @@ class WelcomeSplashLayout extends StatelessWidget {
         border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE1E3E4)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),

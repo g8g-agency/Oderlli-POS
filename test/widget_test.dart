@@ -9,6 +9,10 @@ import 'package:orderlli_pos/core/constants/app_constants.dart';
 void main() {
   testWidgets('Orderlli POS app smoke test — renders without crashing',
       (WidgetTester tester) async {
+    // Set a realistic tablet design size to prevent test-only layout overflows
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1.0;
+
     await tester.pumpWidget(
       ScreenUtilInit(
         designSize: const Size(
