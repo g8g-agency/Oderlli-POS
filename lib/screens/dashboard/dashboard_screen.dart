@@ -563,9 +563,12 @@ class _OrderCard extends StatelessWidget {
 
   Color _statusColor(OrderStatus status) => switch (status) {
         OrderStatus.pending => AppColors.pending,
+        OrderStatus.accepted => AppColors.preparing,
         OrderStatus.preparing => AppColors.preparing,
         OrderStatus.ready => AppColors.ready,
         OrderStatus.served => AppColors.statusServed,
+        OrderStatus.completed => AppColors.ready,
         OrderStatus.cancelled => AppColors.statusCancelled,
+        OrderStatus.syncConflict => AppColors.statusCancelled,
       };
 }

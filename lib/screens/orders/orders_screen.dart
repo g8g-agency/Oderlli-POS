@@ -277,10 +277,13 @@ class _OrderRow extends ConsumerWidget {
 
   Color _statusColor(OrderStatus status) => switch (status) {
         OrderStatus.pending => AppColors.statusPending,
+        OrderStatus.accepted => AppColors.statusPreparing,
         OrderStatus.preparing => AppColors.statusPreparing,
         OrderStatus.ready => AppColors.statusReady,
         OrderStatus.served => AppColors.statusServed,
+        OrderStatus.completed => AppColors.statusReady,
         OrderStatus.cancelled => AppColors.statusCancelled,
+        OrderStatus.syncConflict => AppColors.statusCancelled,
       };
 }
 

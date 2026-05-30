@@ -1,3 +1,5 @@
+import 'modifier_group.dart';
+
 /// A single item on the restaurant's menu.
 class MenuItem {
   const MenuItem({
@@ -13,6 +15,7 @@ class MenuItem {
     this.allergens = const [],
     this.preparationTimeMinutes = 10,
     this.tags = const [],
+    this.modifierGroups = const [],
   });
 
   final String id;
@@ -27,6 +30,7 @@ class MenuItem {
   final List<String> allergens;
   final int preparationTimeMinutes;
   final List<String> tags;
+  final List<ModifierGroup> modifierGroups;
 
   MenuItem copyWith({
     String? id,
@@ -41,6 +45,7 @@ class MenuItem {
     List<String>? allergens,
     int? preparationTimeMinutes,
     List<String>? tags,
+    List<ModifierGroup>? modifierGroups,
   }) =>
       MenuItem(
         id: id ?? this.id,
@@ -56,6 +61,7 @@ class MenuItem {
         preparationTimeMinutes:
             preparationTimeMinutes ?? this.preparationTimeMinutes,
         tags: tags ?? this.tags,
+        modifierGroups: modifierGroups ?? this.modifierGroups,
       );
 
   @override
@@ -69,3 +75,4 @@ class MenuItem {
   @override
   int get hashCode => id.hashCode;
 }
+

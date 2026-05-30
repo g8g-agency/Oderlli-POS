@@ -91,9 +91,11 @@ class MenuRepository {
                 if (a.spiceLevel != 'none') a.spiceLevel,
                 ...a.dietaryTags,
               ],
+              modifierGroups: a.modifierGroups,
             ),
           )
           .toList();
+
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[MenuRepository] fetchMenuItems failed: $e');
