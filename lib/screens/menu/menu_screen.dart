@@ -125,16 +125,21 @@ class MenuScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final categories = ref.watch(categoriesProvider);
+    final categoriesAsync = ref.watch(categoriesProvider);
+    final menuItemsAsync = ref.watch(menuItemsProvider);
+    
+    final categories = categoriesAsync.valueOrNull ?? [];
     final selectedCat = ref.watch(selectedCategoryProvider);
     final items = ref.watch(searchedMenuItemsProvider);
     final cartState = ref.watch(posCartProvider);
     
     // Watch active table metadata
     final tableId = ref.watch(activeTableIdProvider);
-    final tables = ref.watch(posTablesProvider);
+    final tables = ref.watch(posTablesProvider).valueOrNull ?? [];
     final activeTable = tableId != null
-        ? tables.firstWhere((t) => t.id == tableId, orElse: () => tables.first)
+        ? (tables.isEmpty
+            ? null
+            : tables.firstWhere((t) => t.id == tableId, orElse: () => tables.first))
         : null;
 
     final isVertical = context.isVerticalLayout;
@@ -188,52 +193,72 @@ class MenuScreen extends ConsumerWidget {
 
           // ── Menu Items Grid ───────────────────────────────────────────────
           Expanded(
-            child: items.isEmpty
-                ? const Center(
+            child: menuItemsAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(
+                  color: LightPOSColors.primary,
+                ),
+              ),
+              error: (err, stack) => Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.r),
+                  child: EmptyStateWidget(
+                    icon: Icons.wifi_off_outlined,
+                    title: 'Connection Error',
+                    description: 'Failed to fetch menu items from the server. Please check your connection.\n$err',
+                  ),
+                ),
+              ),
+              data: (_) {
+                if (items.isEmpty) {
+                  return const Center(
                     child: EmptyStateWidget(
                       icon: Icons.search_off_outlined,
                       title: 'No Items Found',
                       description: 'No menu products match your search query or selected category filter.',
                     ),
-                  )
-                : LayoutBuilder(
-                    builder: (context, constraints) {
-                      final width = constraints.maxWidth;
-                      final crossAxisCount = width > 1600
-                          ? 5
-                          : (width > 1200
-                              ? 4
-                              : (width > 900 ? 3 : 2));
-                      // Dynamically calculate aspect ratio so card details never overflow
-                      final childAspectRatio = width > 1600
-                          ? 0.85
-                          : (width > 1200
-                              ? 0.86
-                              : (width > 900 ? 0.88 : 0.85));
+                  );
+                }
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth;
+                    final crossAxisCount = width > 1600
+                        ? 5
+                        : (width > 1200
+                            ? 4
+                            : (width > 900 ? 3 : 2));
+                    // Dynamically calculate aspect ratio so card details never overflow
+                    final childAspectRatio = width > 1600
+                        ? 0.85
+                        : (width > 1200
+                            ? 0.86
+                            : (width > 900 ? 0.88 : 0.85));
 
-                      return GridView.builder(
-                        padding: EdgeInsets.all(16.r),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          crossAxisSpacing: 12.w,
-                          mainAxisSpacing: 12.h,
-                          childAspectRatio: childAspectRatio,
-                        ),
-                        itemCount: items.length,
-                        itemBuilder: (context, i) {
-                          final item = items[i];
-                          final cartIndex = cartState.items.indexWhere((c) => c.menuItem.id == item.id);
-                          final qtyInCart = cartIndex >= 0 ? cartState.items[cartIndex].qty : 0;
+                    return GridView.builder(
+                      padding: EdgeInsets.all(16.r),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 12.w,
+                        mainAxisSpacing: 12.h,
+                        childAspectRatio: childAspectRatio,
+                      ),
+                      itemCount: items.length,
+                      itemBuilder: (context, i) {
+                        final item = items[i];
+                        final cartIndex = cartState.items.indexWhere((c) => c.menuItem.id == item.id);
+                        final qtyInCart = cartIndex >= 0 ? cartState.items[cartIndex].qty : 0;
 
-                          return MenuItemCard(
-                            item: item,
-                            qtyInCart: qtyInCart,
-                            onAdd: () => ref.read(posCartProvider.notifier).addItem(item),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                        return MenuItemCard(
+                          item: item,
+                          qtyInCart: qtyInCart,
+                          onAdd: () => ref.read(posCartProvider.notifier).addItem(item),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),

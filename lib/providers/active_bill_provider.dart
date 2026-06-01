@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import 'orders_provider.dart';
-import 'pos_tables_provider.dart';
+import 'table_provider.dart';
 
 /// Tracks the active table being checked out.
 final activeTableIdProvider = StateProvider<String?>((ref) => null);
@@ -19,7 +19,8 @@ final activeTableOrderProvider = Provider<Order?>((ref) {
     );
   }
   
-  final tables = ref.watch(posTablesProvider);
+  final tables = ref.watch(posTablesProvider).valueOrNull ?? [];
+  if (tables.isEmpty) return null;
   final table = tables.firstWhere((t) => t.id == tableId, orElse: () => tables.first);
   
   return orders.firstWhere(

@@ -1,5 +1,18 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/services/cart_service.dart';
+import '../core/repositories/cart_repository.dart';
 import '../models/models.dart';
+import 'auth_provider.dart';
+import 'menu_provider.dart';
+
+/// State provider for selected table in the cart screen.
+final cartSelectedTableProvider = StateProvider<String?>((ref) => null);
+
+
+
+// ─── POS Cart Item Wrapper ───────────────────────────────────────────────────
 
 class POSCartItem {
   const POSCartItem({
@@ -7,12 +20,16 @@ class POSCartItem {
     this.qty = 1,
     this.notes,
     this.selectedModifiers = const [],
+    this.backendId,
+    this.versionNum = 1,
   });
 
   final MenuItem menuItem;
   final int qty;
   final String? notes;
   final List<String> selectedModifiers;
+  final String? backendId; // backend CartItem id
+  final int versionNum; // backend CartItem version_num
 
   double get subtotal => menuItem.price * qty;
 
@@ -21,25 +38,41 @@ class POSCartItem {
     int? qty,
     String? notes,
     List<String>? selectedModifiers,
+    String? backendId,
+    int? versionNum,
   }) =>
       POSCartItem(
         menuItem: menuItem ?? this.menuItem,
         qty: qty ?? this.qty,
         notes: notes ?? this.notes,
         selectedModifiers: selectedModifiers ?? this.selectedModifiers,
+        backendId: backendId ?? this.backendId,
+        versionNum: versionNum ?? this.versionNum,
       );
 }
+
+// ─── POS Cart State Wrapper ──────────────────────────────────────────────────
 
 class POSCartState {
   const POSCartState({
     this.items = const [],
     this.discountPercent = 0.0,
     this.taxPercent = 5.0,
+    this.isLoading = false,
+    this.errorMessage,
+    this.isSchemaMismatch = false,
+    this.backendCartVersionNum = 1,
+    this.backendCartId,
   });
 
   final List<POSCartItem> items;
   final double discountPercent;
   final double taxPercent;
+  final bool isLoading;
+  final String? errorMessage;
+  final bool isSchemaMismatch; // If true, displays blocking config mismatch error
+  final int backendCartVersionNum; // expectedCartRevision version_num
+  final String? backendCartId;
 
   double get subtotal => items.fold(0.0, (sum, item) => sum + item.subtotal);
   double get discountAmount => subtotal * (discountPercent / 100);
@@ -47,99 +80,392 @@ class POSCartState {
   double get taxAmount => taxableAmount * (taxPercent / 100);
   double get total => taxableAmount + taxAmount;
   int get totalQty => items.fold(0, (sum, item) => sum + item.qty);
+
+  POSCartState copyWith({
+    List<POSCartItem>? items,
+    double? discountPercent,
+    double? taxPercent,
+    bool? isLoading,
+    ValueGetter<String?>? errorMessage,
+    bool? isSchemaMismatch,
+    int? backendCartVersionNum,
+    String? backendCartId,
+  }) =>
+      POSCartState(
+        items: items ?? this.items,
+        discountPercent: discountPercent ?? this.discountPercent,
+        taxPercent: taxPercent ?? this.taxPercent,
+        isLoading: isLoading ?? this.isLoading,
+        errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
+        isSchemaMismatch: isSchemaMismatch ?? this.isSchemaMismatch,
+        backendCartVersionNum: backendCartVersionNum ?? this.backendCartVersionNum,
+        backendCartId: backendCartId ?? this.backendCartId,
+      );
 }
 
-class POSCartNotifier extends StateNotifier<POSCartState> {
-  POSCartNotifier() : super(const POSCartState());
+// ─── Infrastructure Providers ─────────────────────────────────────────────────
 
-  void addItem(MenuItem menuItem) {
-    final existingIndex = state.items.indexWhere((i) => i.menuItem.id == menuItem.id);
-    if (existingIndex >= 0) {
-      final updatedItems = List<POSCartItem>.from(state.items);
-      updatedItems[existingIndex] = updatedItems[existingIndex].copyWith(
-        qty: updatedItems[existingIndex].qty + 1,
+final cartServiceProvider = Provider<CartService>((ref) {
+  final dioClient = ref.watch(dioClientProvider);
+  return CartService(dioClient);
+});
+final cartRepositoryProvider = Provider<CartRepository>((ref) {
+  final service = ref.watch(cartServiceProvider);
+  final conn = ref.watch(connectivityServiceProvider);
+  return CartRepository(service, conn);
+});
+
+final cartSessionIdsProvider = FutureProvider<({String? tenantId, String? branchId})>((ref) async {
+  final secureStorage = ref.watch(secureStorageProvider);
+  final credentials = await secureStorage.getCredentials();
+  final userJson = credentials['userJson'];
+  if (userJson == null) return (tenantId: null, branchId: null);
+  try {
+    final decoded = jsonDecode(userJson) as Map<String, dynamic>;
+    final backendUser = BackendUser.fromJson(decoded);
+    final tenantId = backendUser.tenantId;
+    final branchId = backendUser.branchIds.isNotEmpty ? backendUser.branchIds.first : null;
+    return (tenantId: tenantId, branchId: branchId);
+  } catch (e) {
+    if (kDebugMode) debugPrint('[cartSessionIdsProvider] Could not parse stored user: $e');
+    return (tenantId: null, branchId: null);
+  }
+});
+
+// ─── POS Cart Notifier ────────────────────────────────────────────────────────
+
+class POSCartNotifier extends StateNotifier<POSCartState> {
+  final Ref? ref;
+  final CartRepository repository;
+  final String? tenantId;
+  final String? branchId;
+  final String? tableId;
+
+  POSCartNotifier({
+    required this.ref,
+    required this.repository,
+    required this.tenantId,
+    required this.branchId,
+    required this.tableId,
+  })  : super(const POSCartState());
+
+  /// Load cart details from the backend/repository
+  Future<void> loadCart() async {
+    if (tenantId == null || branchId == null || tableId == null) {
+      state = state.copyWith(isLoading: false);
+      return;
+    }
+    state = state.copyWith(isLoading: true, errorMessage: () => null, isSchemaMismatch: false);
+    try {
+      final cart = await repository.getCart(tenantId!, branchId!, tableId!);
+      _updateStateFromCart(cart);
+    } on DatabaseSchemaMismatchException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        isSchemaMismatch: true,
+        errorMessage: () => e.message,
       );
-      state = POSCartState(
-        items: updatedItems,
-        discountPercent: state.discountPercent,
-        taxPercent: state.taxPercent,
+    } on OfflineCartException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: () => e.message,
       );
-    } else {
-      state = POSCartState(
-        items: [...state.items, POSCartItem(menuItem: menuItem)],
-        discountPercent: state.discountPercent,
-        taxPercent: state.taxPercent,
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: () => e.toString(),
       );
     }
   }
 
-  void removeItem(MenuItem menuItem) {
-    final existingIndex = state.items.indexWhere((i) => i.menuItem.id == menuItem.id);
-    if (existingIndex >= 0) {
-      final updatedItems = List<POSCartItem>.from(state.items);
-      if (updatedItems[existingIndex].qty > 1) {
-        updatedItems[existingIndex] = updatedItems[existingIndex].copyWith(
-          qty: updatedItems[existingIndex].qty - 1,
-        );
-        state = POSCartState(
-          items: updatedItems,
-          discountPercent: state.discountPercent,
-          taxPercent: state.taxPercent,
-        );
-      } else {
-        updatedItems.removeAt(existingIndex);
-        state = POSCartState(
-          items: updatedItems,
-          discountPercent: state.discountPercent,
-          taxPercent: state.taxPercent,
-        );
+  /// Bumps expectedCartRevision and loads latest state
+  Future<void> refreshCart() async {
+    await loadCart();
+  }
+
+  /// Frontend validator check for modifier groups
+  void _validateModifiers(MenuItem menuItem, List<String> selectedModifiers) {
+    for (final group in menuItem.modifierGroups) {
+      final selectedOptionsInGroup = group.options.where((opt) {
+        return selectedModifiers.any((m) => m.toLowerCase() == opt.name.toLowerCase());
+      }).toList();
+
+      final count = selectedOptionsInGroup.length;
+
+      if (group.isRequired && count == 0) {
+        throw CartValidationException('Modifier group "${group.name}" is required. Please select at least 1 option.');
+      }
+      if (count < group.minSelect) {
+        throw CartValidationException('Please select at least ${group.minSelect} option(s) for "${group.name}".');
+      }
+      if (group.maxSelect != null && count > group.maxSelect!) {
+        throw CartValidationException('Please select at most ${group.maxSelect} option(s) for "${group.name}".');
       }
     }
   }
 
-  void updateNotes(String menuItemId, String notes) {
-    state = POSCartState(
-      items: [
-        for (final item in state.items)
-          if (item.menuItem.id == menuItemId) item.copyWith(notes: notes) else item,
-      ],
-      discountPercent: state.discountPercent,
-      taxPercent: state.taxPercent,
-    );
+  /// Add item to cart
+  Future<void> addItem(MenuItem menuItem) async {
+    if (tenantId == null || branchId == null || tableId == null) return;
+    
+    // Check if the item already exists with exact same modifiers (none, by default when adding from book)
+    final existingIndex = state.items.indexWhere(
+        (i) => i.menuItem.id == menuItem.id && i.selectedModifiers.isEmpty);
+
+    state = state.copyWith(isLoading: true, errorMessage: () => null);
+
+    try {
+      Cart updatedCart;
+      if (existingIndex >= 0) {
+        final existingItem = state.items[existingIndex];
+        updatedCart = await repository.updateCartItem(
+          tenantId: tenantId!,
+          branchId: branchId!,
+          tableId: tableId!,
+          itemId: existingItem.backendId ?? '',
+          quantity: existingItem.qty + 1,
+          itemNotes: existingItem.notes,
+          itemVersionNum: existingItem.versionNum,
+          expectedCartRevision: state.backendCartVersionNum,
+        );
+      } else {
+        // Validate modifier constraints (defaulting to empty modifier selection)
+        _validateModifiers(menuItem, []);
+
+        updatedCart = await repository.addCartItem(
+          tenantId: tenantId!,
+          branchId: branchId!,
+          tableId: tableId!,
+          menuItem: menuItem,
+          quantity: 1,
+          expectedCartRevision: state.backendCartVersionNum,
+        );
+      }
+      _updateStateFromCart(updatedCart);
+    } on StaleCartRevisionException {
+      // Recovery step: reload the cart and throw conflict message
+      await refreshCart();
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: () => 'OCC Conflict: Cart updated by another terminal. Reloaded. Please retry.',
+      );
+    } on CartValidationException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: () => e.message);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: () => e.toString());
+    }
   }
 
-  void toggleModifier(String menuItemId, String modifier) {
-    state = POSCartState(
-      items: [
-        for (final item in state.items)
-          if (item.menuItem.id == menuItemId)
-            item.copyWith(
-              selectedModifiers: item.selectedModifiers.contains(modifier)
-                  ? item.selectedModifiers.where((m) => m != modifier).toList()
-                  : [...item.selectedModifiers, modifier],
-            )
-          else
-            item,
-      ],
-      discountPercent: state.discountPercent,
-      taxPercent: state.taxPercent,
-    );
+  /// Decrement or remove item from cart
+  Future<void> removeItem(MenuItem menuItem) async {
+    if (tenantId == null || branchId == null || tableId == null) return;
+
+    // Remove the last matching item by ID
+    final existingIndex = state.items.lastIndexWhere((i) => i.menuItem.id == menuItem.id);
+    if (existingIndex < 0) return;
+
+    final existingItem = state.items[existingIndex];
+    state = state.copyWith(isLoading: true, errorMessage: () => null);
+
+    try {
+      Cart updatedCart;
+      if (existingItem.qty > 1) {
+        updatedCart = await repository.updateCartItem(
+          tenantId: tenantId!,
+          branchId: branchId!,
+          tableId: tableId!,
+          itemId: existingItem.backendId ?? '',
+          quantity: existingItem.qty - 1,
+          itemNotes: existingItem.notes,
+          itemVersionNum: existingItem.versionNum,
+          expectedCartRevision: state.backendCartVersionNum,
+        );
+      } else {
+        updatedCart = await repository.removeCartItem(
+          tenantId: tenantId!,
+          branchId: branchId!,
+          tableId: tableId!,
+          itemId: existingItem.backendId ?? '',
+          itemVersionNum: existingItem.versionNum,
+          expectedCartRevision: state.backendCartVersionNum,
+        );
+      }
+      _updateStateFromCart(updatedCart);
+    } on StaleCartRevisionException {
+      await refreshCart();
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: () => 'OCC Conflict: Cart was updated. Reloaded. Please retry.',
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: () => e.toString());
+    }
   }
 
+  /// Update item notes
+  Future<void> updateNotes(String menuItemId, String notes) async {
+    if (tenantId == null || branchId == null || tableId == null) return;
+
+    final existingIndex = state.items.indexWhere((i) => i.menuItem.id == menuItemId);
+    if (existingIndex < 0) return;
+
+    final existingItem = state.items[existingIndex];
+    state = state.copyWith(isLoading: true, errorMessage: () => null);
+
+    try {
+      final updatedCart = await repository.updateCartItem(
+        tenantId: tenantId!,
+        branchId: branchId!,
+        tableId: tableId!,
+        itemId: existingItem.backendId ?? '',
+        quantity: existingItem.qty,
+        itemNotes: notes,
+        itemVersionNum: existingItem.versionNum,
+        expectedCartRevision: state.backendCartVersionNum,
+      );
+      _updateStateFromCart(updatedCart);
+    } on StaleCartRevisionException {
+      await refreshCart();
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: () => 'OCC Conflict: Cart was updated. Reloaded. Please retry.',
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: () => e.toString());
+    }
+  }
+
+  /// Toggle modifiers.
+  /// Backend doesn't support modifier patching directly on items,
+  /// so we resolve this by deleting the existing item and re-adding it with new modifiers.
+  Future<void> toggleModifier(String menuItemId, String modifier) async {
+    if (tenantId == null || branchId == null || tableId == null) return;
+
+    final existingIndex = state.items.indexWhere((i) => i.menuItem.id == menuItemId);
+    if (existingIndex < 0) return;
+
+    final existingItem = state.items[existingIndex];
+    final currentModifiers = List<String>.from(existingItem.selectedModifiers);
+
+    if (currentModifiers.contains(modifier)) {
+      currentModifiers.remove(modifier);
+    } else {
+      currentModifiers.add(modifier);
+    }
+
+    // Perform validation check on the new modifier list
+    try {
+      _validateModifiers(existingItem.menuItem, currentModifiers);
+    } on CartValidationException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: () => e.message);
+      return;
+    }
+
+    state = state.copyWith(isLoading: true, errorMessage: () => null);
+
+    try {
+      // Step 1: Remove original item
+      var updatedCart = await repository.removeCartItem(
+        tenantId: tenantId!,
+        branchId: branchId!,
+        tableId: tableId!,
+        itemId: existingItem.backendId ?? '',
+        itemVersionNum: existingItem.versionNum,
+        expectedCartRevision: state.backendCartVersionNum,
+      );
+
+      // Step 2: Add item with new modifiers list
+      updatedCart = await repository.addCartItem(
+        tenantId: tenantId!,
+        branchId: branchId!,
+        tableId: tableId!,
+        menuItem: existingItem.menuItem,
+        quantity: existingItem.qty,
+        itemNotes: existingItem.notes,
+        selectedModifiers: currentModifiers,
+        expectedCartRevision: updatedCart.versionNum, // Use new version num from DELETE response
+      );
+
+      _updateStateFromCart(updatedCart);
+    } on StaleCartRevisionException {
+      await refreshCart();
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: () => 'OCC Conflict: Cart was updated. Reloaded. Please retry.',
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: () => e.toString());
+    }
+  }
+
+  /// Apply discount
   void applyDiscount(double percent) {
-    state = POSCartState(
-      items: state.items,
-      discountPercent: percent,
-      taxPercent: state.taxPercent,
-    );
+    state = state.copyWith(discountPercent: percent);
   }
 
+  /// Clear the cart completely (locally / session reset)
   void clear() {
     state = const POSCartState();
   }
+
+  /// Map backend Cart structure back to POSCartState
+  void _updateStateFromCart(Cart cart) {
+    final menuItems = ref?.read(menuItemsProvider).valueOrNull ?? [];
+
+    final mappedItems = cart.items.map((item) {
+      final menuItem = menuItems.firstWhere(
+        (m) => m.id == item.menuItemId,
+        orElse: () => MenuItem(
+          id: item.menuItemId,
+          name: item.itemNameSnapshot,
+          categoryId: '',
+          price: item.unitPrice,
+          modifierGroups: const [],
+        ),
+      );
+
+      return POSCartItem(
+        menuItem: menuItem,
+        qty: item.quantity,
+        notes: item.itemNotes,
+        selectedModifiers: item.modifiers.map((m) => m.modifierOptionNameSnapshot).toList(),
+        backendId: item.id,
+        versionNum: item.versionNum,
+      );
+    }).toList();
+
+    state = POSCartState(
+      items: mappedItems,
+      discountPercent: state.discountPercent,
+      taxPercent: state.taxPercent,
+      isLoading: false,
+      errorMessage: null,
+      isSchemaMismatch: false,
+      backendCartVersionNum: cart.versionNum,
+      backendCartId: cart.id,
+    );
+  }
 }
 
-/// State notifier provider for the active cart.
-final posCartProvider = StateNotifierProvider<POSCartNotifier, POSCartState>(
-  (ref) => POSCartNotifier(),
-);
+// ─── Riverpod Provider Hook ───────────────────────────────────────────────────
+
+final posCartProvider = StateNotifierProvider<POSCartNotifier, POSCartState>((ref) {
+  final repository = ref.watch(cartRepositoryProvider);
+  final sessionIds = ref.watch(cartSessionIdsProvider).valueOrNull;
+  final selectedTableId = ref.watch(cartSelectedTableProvider);
+
+  final notifier = POSCartNotifier(
+    ref: ref,
+    repository: repository,
+    tenantId: sessionIds?.tenantId,
+    branchId: sessionIds?.branchId,
+    tableId: selectedTableId,
+  );
+
+  // Trigger loading the cart immediately when table selection is populated
+  if (selectedTableId != null) {
+    notifier.loadCart();
+  }
+
+  return notifier;
+});

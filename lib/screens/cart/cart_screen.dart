@@ -10,8 +10,6 @@ import '../../providers/providers.dart';
 import '../../widgets/widgets.dart';
 import '../../core/extensions/extensions.dart';
 
-/// State provider for selected table in the cart screen.
-final cartSelectedTableProvider = StateProvider<String?>((ref) => null);
 
 class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
@@ -46,7 +44,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Widget build(BuildContext context) {
     final cartState = ref.watch(posCartProvider);
     final selectedTableId = ref.watch(cartSelectedTableProvider);
-    final tables = ref.watch(posTablesProvider);
+    final tables = ref.watch(posTablesProvider).valueOrNull ?? [];
 
     // If activeTableIdProvider from Floor Plan is set, pre-fill selectedTableId
     final floorSelectedTableId = ref.watch(activeTableIdProvider);
@@ -56,9 +54,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       }
     });
 
-    final currentSelectedTable = selectedTableId != null
-        ? tables.firstWhere((t) => t.id == selectedTableId, orElse: () => tables.first)
-        : tables.firstWhere((t) => t.status == POSTableStatus.occupied || t.status == POSTableStatus.preparing, orElse: () => tables.first);
+    final TableModel? currentSelectedTable = tables.isEmpty
+        ? null
+        : (selectedTableId != null
+            ? tables.firstWhere((t) => t.id == selectedTableId, orElse: () => tables.first)
+            : tables.firstWhere((t) => t.status == POSTableStatus.occupied || t.status == POSTableStatus.preparing, orElse: () => tables.first));
 
     final isVertical = context.isVerticalLayout;
 
@@ -100,23 +100,99 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ),
     );
 
-    final itemsListWidget = cartState.items.isEmpty
-        ? const Center(
-            child: EmptyStateWidget(
-              icon: Icons.shopping_basket_outlined,
-              title: 'Cart is empty',
-              description: 'Go back to the Menu Book to add dishes to the cart.',
-            ),
-          )
-        : ListView.separated(
-            padding: EdgeInsets.all(isVertical ? 16.r : 24.r),
-            itemCount: cartState.items.length,
-            separatorBuilder: (context, index) => Gap(16.h),
-            itemBuilder: (context, index) {
-              final item = cartState.items[index];
-              return _buildCartItemCard(context, ref, item);
-            },
-          );
+    final Widget itemsListWidget;
+
+    if (cartState.isSchemaMismatch) {
+      itemsListWidget = Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.r),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline_outlined, color: AppColors.loss, size: 64.sp),
+              Gap(16.h),
+              Text(
+                'Database Migration Pending',
+                style: AppTextStyles.headlineSmall.copyWith(
+                  color: AppColors.loss,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Gap(8.h),
+              Text(
+                cartState.errorMessage ?? 'The backend is missing necessary database tables. Please contact your system administrator to apply migrations.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodyMedium,
+              ),
+              Gap(24.h),
+              OutlinedButton.icon(
+                onPressed: () => ref.read(posCartProvider.notifier).refreshCart(),
+                icon: const Icon(Icons.refresh_outlined),
+                label: const Text('RETRY CONNECTION'),
+                style: OutlinedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (cartState.isLoading && cartState.items.isEmpty) {
+      itemsListWidget = const Center(
+        child: CircularProgressIndicator(),
+      );
+    } else {
+      final Widget errorBanner = cartState.errorMessage != null
+          ? Container(
+              margin: EdgeInsets.all(16.r),
+              padding: EdgeInsets.all(12.r),
+              decoration: BoxDecoration(
+                color: AppColors.lossContainer.withValues(alpha: 0.1),
+                border: Border.all(color: AppColors.loss),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: AppColors.loss, size: 20.sp),
+                  Gap(8.w),
+                  Expanded(
+                    child: Text(
+                      cartState.errorMessage!,
+                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.loss),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : const SizedBox.shrink();
+
+      itemsListWidget = Column(
+        children: [
+          errorBanner,
+          Expanded(
+            child: cartState.items.isEmpty
+                ? const Center(
+                    child: EmptyStateWidget(
+                      icon: Icons.shopping_basket_outlined,
+                      title: 'Cart is empty',
+                      description: 'Go back to the Menu Book to add dishes to the cart.',
+                    ),
+                  )
+                : ListView.separated(
+                    padding: EdgeInsets.all(isVertical ? 16.r : 24.r),
+                    itemCount: cartState.items.length,
+                    separatorBuilder: (context, index) => Gap(16.h),
+                    itemBuilder: (context, index) {
+                      final item = cartState.items[index];
+                      return _buildCartItemCard(context, ref, item);
+                    },
+                  ),
+          ),
+        ],
+      );
+    }
+
 
     final dispatchWidget = Container(
       color: AppColors.sidebarBg,
@@ -136,27 +212,33 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 children: [
                   Text('Table Mapping', style: AppTextStyles.titleMedium),
                   Gap(12.h),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedTableId ?? currentSelectedTable.id,
-                    dropdownColor: AppColors.surfaceElevated,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.table_restaurant_outlined),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  if (tables.isEmpty)
+                    Text(
+                      'No tables configured for this branch',
+                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedTableId ?? currentSelectedTable?.id,
+                      dropdownColor: AppColors.surfaceElevated,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.table_restaurant_outlined),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                      ),
+                      items: tables.map((t) {
+                        return DropdownMenuItem<String>(
+                          value: t.id,
+                          child: Text(
+                            'Table ${t.number} (${t.status.label})',
+                            style: AppTextStyles.bodyMedium,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        ref.read(cartSelectedTableProvider.notifier).state = val;
+                      },
                     ),
-                    items: tables.map((t) {
-                      return DropdownMenuItem<String>(
-                        value: t.id,
-                        child: Text(
-                          'Table ${t.number} (${t.status.label})',
-                          style: AppTextStyles.bodyMedium,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      ref.read(cartSelectedTableProvider.notifier).state = val;
-                    },
-                  ),
-                  if (currentSelectedTable.waiterName != null) ...[
+                  if (currentSelectedTable != null && currentSelectedTable.waiterName != null) ...[
                     Gap(10.h),
                     Row(
                       children: [
@@ -220,71 +302,59 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 Gap(12.w),
                 Expanded(
                   child: PrimaryButton(
-                    onPressed: cartState.items.isEmpty
+                    onPressed: cartState.items.isEmpty || _isSending
                         ? null
                         : () async {
-                            setState(() {
-                              _isSending = true;
-                            });
+                             setState(() {
+                               _isSending = true;
+                             });
 
-                            // Simulate kitchen ticket dispatch
-                            await Future.delayed(const Duration(seconds: 1));
+                             final selectedTable = currentSelectedTable;
+                             if (selectedTable == null) {
+                               setState(() {
+                                 _isSending = false;
+                               });
+                               this.context.showErrorSnack('No table selected.');
+                               return;
+                             }
 
-                            if (!mounted) return;
+                             final sessionIds = ref.read(cartSessionIdsProvider).valueOrNull;
+                             final tenantId = sessionIds?.tenantId ?? 'tenant-mock';
+                             final branchId = sessionIds?.branchId ?? 'branch-mock';
+                             final cartId = cartState.backendCartId ?? 'cart-placeholder';
 
-                            // Dispatch Order to Kitchen
-                            final selectedTable = currentSelectedTable;
+                             try {
+                               await ref.read(ordersProvider.notifier).checkout(
+                                     tenantId: tenantId,
+                                     branchId: branchId,
+                                     tableId: selectedTable.id,
+                                     cartId: cartId,
+                                     expectedCartRevision: cartState.backendCartVersionNum,
+                                     orderNotes: null, // No order-level notes field in current UI
+                                   );
 
-                            final newOrder = Order(
-                              id: 'ord-${DateTime.now().millisecondsSinceEpoch}',
-                              tableId: selectedTable.id,
-                              tableNumber: selectedTable.number,
-                              status: OrderStatus.preparing,
-                              createdAt: DateTime.now(),
-                              discountPercent: cartState.discountPercent,
-                              taxPercent: cartState.taxPercent,
-                              servedBy: selectedTable.waiterName ?? 'Sarah',
-                              items: cartState.items.map((c) {
-                                return OrderItem(
-                                  id: 'oi-${DateTime.now().millisecondsSinceEpoch}-${c.menuItem.id}',
-                                  menuItem: c.menuItem,
-                                  quantity: c.qty,
-                                  notes: c.notes,
-                                  modifiers: c.selectedModifiers,
-                                );
-                              }).toList(),
-                            );
+                               // Reset selected table contexts
+                               ref.read(cartSelectedTableProvider.notifier).state = null;
+                               ref.read(activeTableIdProvider.notifier).state = null;
 
-                            // Add order
-                            ref.read(ordersProvider.notifier).addOrder(newOrder);
+                               setState(() {
+                                 _isSending = false;
+                               });
 
-                            // Update table to occupied/preparing
-                            ref.read(posTablesProvider.notifier).seatTable(
-                                  selectedTable.id,
-                                  selectedTable.guestCount > 0 ? selectedTable.guestCount : 2,
-                                  selectedTable.waiterName ?? 'Sarah',
-                                );
-                            ref.read(posTablesProvider.notifier).updateStatus(selectedTable.id, POSTableStatus.preparing);
-                            ref.read(posTablesProvider.notifier).updateBill(selectedTable.id, cartState.total);
+                               if (!mounted) return;
+                               // Success visual confirmation
+                               this.context.showSuccessSnack('Order dispatched to KDS successfully! Table ${selectedTable.number} is now active.');
 
-                            // Reset selected table contexts
-                            ref.read(cartSelectedTableProvider.notifier).state = null;
-                            ref.read(activeTableIdProvider.notifier).state = null;
-
-                            // Clear active cart
-                            ref.read(posCartProvider.notifier).clear();
-
-                            setState(() {
-                              _isSending = false;
-                            });
-
-                            if (!mounted) return;
-                            // Success visual confirmation
-                            this.context.showSuccessSnack('Order dispatched to KDS successfully!');
-
-                            // Route back to floorplan
-                            this.context.go('/floor');
-                          },
+                               // Route back to floorplan
+                               this.context.go('/floor');
+                             } catch (e) {
+                               setState(() {
+                                 _isSending = false;
+                               });
+                               if (!mounted) return;
+                               this.context.showErrorSnack(e.toString());
+                             }
+                           },
                     text: 'SEND TO KITCHEN',
                     icon: Icons.soup_kitchen_outlined,
                   ),

@@ -23,7 +23,8 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
   @override
   Widget build(BuildContext context) {
     final tables = ref.watch(posFilteredTablesProvider);
-    final allTables = ref.watch(posTablesProvider);
+    final allTablesAsync = ref.watch(posTablesProvider);
+    final allTables = allTablesAsync.valueOrNull ?? [];
     final sections = ref.watch(posTableSectionsProvider);
     final selectedSection = ref.watch(posSelectedSectionProvider);
 
@@ -74,6 +75,14 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
                       ],
                     ),
                   ),
+                ),
+                Gap(16.w),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
+                  tooltip: 'Refresh Floor Plan',
+                  onPressed: () {
+                    ref.read(posTablesProvider.notifier).refreshTables();
+                  },
                 ),
                 Gap(16.w),
                 const StatusChip(label: 'LIVE FLOORS', color: AppColors.success),
@@ -166,6 +175,39 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
   }
 
   Widget _buildGrid(List<dynamic> tables) {
+    final allTablesAsync = ref.watch(posTablesProvider);
+
+    if (allTablesAsync.isLoading && (allTablesAsync.valueOrNull ?? []).isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: AppColors.primary,
+        ),
+      );
+    }
+
+    if (allTablesAsync.hasError) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.r),
+          child: EmptyStateWidget(
+            icon: Icons.wifi_off_outlined,
+            title: 'Connection Error',
+            description: 'Failed to fetch tables from the server. Please check your connection.\n${allTablesAsync.error}',
+          ),
+        ),
+      );
+    }
+
+    if (tables.isEmpty) {
+      return const Center(
+        child: EmptyStateWidget(
+          icon: Icons.table_restaurant_outlined,
+          title: 'No Tables Configured',
+          description: 'No tables found for this branch in the selected section.',
+        ),
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
