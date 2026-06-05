@@ -1,4 +1,4 @@
-/// Application route name constants for Orderlli POS.
+/// Application route name constants for Orderlyy POS.
 abstract final class AppRoutes {
   // Splash / Authentication
   static const String splash = '/';

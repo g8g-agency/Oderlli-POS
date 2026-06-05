@@ -4,7 +4,7 @@ import 'package:gap/gap.dart';
 import '../theme/theme.dart';
 import '../core/utils/currency_formatter.dart';
 
-/// ─── Orderlli POS · Financial Summary Widget ────────────────────────────────
+/// ─── Orderlyy POS · Financial Summary Widget ────────────────────────────────
 ///
 /// A premium reusable widget to render subtotals, tax rates, promotions/discounts,
 /// and total bill amounts consistently across checkout, billing, and cart screens.

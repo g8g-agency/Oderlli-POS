@@ -208,7 +208,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final repository = _ref.read(authRepositoryProvider);
       
       // Use email corresponding to selected user. If not set, fallback to user id email format.
-      final email = user.email ?? '${user.id}@orderlli.com';
+      final email = user.email ?? '${user.id}@orderlyy.com';
 
       // Login using exact, raw PIN as the password
       final authenticatedUser = await repository.login(email, pin);
@@ -314,7 +314,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final repository = _ref.read(authRepositoryProvider);
       
       // Use email corresponding to the target unlocking user
-      final email = targetUser.email ?? '${targetUser.id}@orderlli.com';
+      final email = targetUser.email ?? '${targetUser.id}@orderlyy.com';
 
       // Login using exact PIN
       final authenticatedUser = await repository.login(email, pin);

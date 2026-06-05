@@ -19,12 +19,12 @@ void main() {
           AppConstants.designWidth,
           AppConstants.designHeight,
         ),
-        builder: (_, _) => const ProviderScope(child: OrderlliApp()),
+        builder: (_, _) => const ProviderScope(child: OrderlyyApp()),
       ),
     );
     // Splash screen should render immediately
     await tester.pump();
-    expect(find.byType(OrderlliApp), findsOneWidget);
+    expect(find.byType(OrderlyyApp), findsOneWidget);
     await tester.pumpAndSettle();
   });
 }

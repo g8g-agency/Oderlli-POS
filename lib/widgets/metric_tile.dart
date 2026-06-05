@@ -3,7 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import '../theme/theme.dart';
 
-/// ─── Orderlli POS · Metric Tile ─────────────────────────────────────────────
+/// ─── Orderlyy POS · Metric Tile ─────────────────────────────────────────────
 ///
 /// A premium key performance metric card for displaying financial data (e.g., revenue,
 /// average ticket size) with trends and color indicators.

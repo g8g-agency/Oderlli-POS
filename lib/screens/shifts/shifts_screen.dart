@@ -1081,7 +1081,7 @@ class _PrintXReportDialogState extends State<_PrintXReportDialog> {
                       child: Column(
                         children: [
                           Text(
-                            'ORDERLLI POS AUDIT',
+                            'ORDERLYY POS AUDIT',
                             style: AppTextStyles.titleMedium.copyWith(
                               color: Colors.black,
                               fontWeight: FontWeight.w900,

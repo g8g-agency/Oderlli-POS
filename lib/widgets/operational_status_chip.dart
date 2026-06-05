@@ -4,7 +4,7 @@ import 'package:gap/gap.dart';
 import '../theme/theme.dart';
 import '../models/models.dart';
 
-/// ─── Orderlli POS · Operational Status Chip ─────────────────────────────────
+/// ─── Orderlyy POS · Operational Status Chip ─────────────────────────────────
 ///
 /// A highly polished, color-coded status chip with micro-animations.
 /// Features a continuous spinning icon for [OperationalStatus.syncing] and a

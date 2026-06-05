@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/theme.dart';
 
-/// ─── Orderlli POS · Operational Status ──────────────────────────────────────
+/// ─── Orderlyy POS · Operational Status ──────────────────────────────────────
 ///
 /// Comprehensive state enum covering physical table states, kitchen order states,
 /// checkout/financial states, and local network syncing states.

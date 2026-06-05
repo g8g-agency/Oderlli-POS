@@ -6,7 +6,7 @@ import '../models/models.dart';
 import '../core/extensions/extensions.dart';
 import 'widgets.dart';
 
-/// ─── Orderlli POS · Table Card Widget ───────────────────────────────────────
+/// ─── Orderlyy POS · Table Card Widget ───────────────────────────────────────
 ///
 /// A premium dining table card optimized for POS tablet grids.
 /// Displays table status, guest capacity, active elapsed timers, assigned waiter,

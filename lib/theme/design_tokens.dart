@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// ─── Orderlli POS · Design Tokens ───────────────────────────────────────────
+/// ─── Orderlyy POS · Design Tokens ───────────────────────────────────────────
 ///
 /// Centralized design tokens serving as the single source of truth for POS layout,
 /// sizes, animations, and shadows.

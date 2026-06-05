@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'auth_session.dart';
 
-/// Roles defining permissions in the Orderlli POS.
+/// Roles defining permissions in the Orderlyy POS.
 enum UserRole {
   manager,
   cashier,
@@ -109,7 +109,7 @@ class PosUser {
       role: UserRole.manager,
       pin: '1111',
       terminalId: 'Terminal 1',
-      email: 'alexander@orderlli.com',
+      email: 'alexander@orderlyy.com',
     ),
     PosUser(
       id: 'usr-sarah',
@@ -117,7 +117,7 @@ class PosUser {
       role: UserRole.cashier,
       pin: '2222',
       terminalId: 'Front Counter',
-      email: 'sarah@orderlli.com',
+      email: 'sarah@orderlyy.com',
     ),
     PosUser(
       id: 'usr-michael',
@@ -125,7 +125,7 @@ class PosUser {
       role: UserRole.cashier,
       pin: '3333',
       terminalId: 'Bar Terminal',
-      email: 'michael@orderlli.com',
+      email: 'michael@orderlyy.com',
     ),
     PosUser(
       id: 'usr-jessica',
@@ -133,7 +133,7 @@ class PosUser {
       role: UserRole.server,
       pin: '4444',
       terminalId: 'Floor Service',
-      email: 'jessica@orderlli.com',
+      email: 'jessica@orderlyy.com',
     ),
   ];
 }

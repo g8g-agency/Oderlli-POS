@@ -1125,7 +1125,7 @@ class _PosLogo extends StatelessWidget {
           text: TextSpan(
             children: [
               TextSpan(
-                text: 'Orderlli',
+                text: 'Orderlyy',
                 style: AppTypography.titleLarge.copyWith(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w800,

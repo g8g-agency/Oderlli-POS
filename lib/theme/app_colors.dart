@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// ─── Orderlli POS · Colour System ───────────────────────────────────────────
+/// ─── Orderlyy POS · Colour System ───────────────────────────────────────────
 ///
 /// Light operational palette designed for:
 ///  • High-contrast light surfaces for modern restaurant environments

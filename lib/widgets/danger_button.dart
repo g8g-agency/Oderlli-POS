@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../theme/theme.dart';
 
-/// ─── Orderlli POS · Danger Button ───────────────────────────────────────────
+/// ─── Orderlyy POS · Danger Button ───────────────────────────────────────────
 ///
 /// Tablet-optimized danger action button with a large touch target (52px height)
 /// and a high-contrast loss/error red fill. Used for voiding, deleting, or cancelling.

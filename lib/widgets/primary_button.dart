@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../theme/theme.dart';
 
-/// ─── Orderlli POS · Primary Button ──────────────────────────────────────────
+/// ─── Orderlyy POS · Primary Button ──────────────────────────────────────────
 ///
 /// Tablet-optimized primary action button with a large touch target (54px height)
 /// and high-contrast styling for rapid kitchen/POS operations.

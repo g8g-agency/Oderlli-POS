@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../theme/theme.dart';
 
-/// ─── Orderlli POS · Status Chip ─────────────────────────────────────────────
+/// ─── Orderlyy POS · Status Chip ─────────────────────────────────────────────
 ///
 /// A high-contrast tag for highlighting order statuses, table states,
 /// or payment statuses in the POS view. Uses a tinted semi-transparent fill.

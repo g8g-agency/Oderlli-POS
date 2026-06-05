@@ -4,7 +4,7 @@ import 'app_colors.dart';
 import 'design_tokens.dart';
 import 'app_typography.dart';
 
-/// ─── Orderlli POS · Material 3 Theme System ──────────────────────────────────
+/// ─── Orderlyy POS · Material 3 Theme System ──────────────────────────────────
 ///
 /// Light operational theme designed for high contrast, clean workspace structure,
 /// and fast, clear visual feedback under busy restaurant environments.
@@ -24,7 +24,7 @@ abstract final class AppTheme {
   static const double elevationMedium = 2;
   static const double elevationHigh = 4;
 
-  /// Light operational theme configuration for Orderlli POS.
+  /// Light operational theme configuration for Orderlyy POS.
   static ThemeData get light => ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,

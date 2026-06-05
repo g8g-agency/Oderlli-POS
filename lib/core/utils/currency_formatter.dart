@@ -1,8 +1,8 @@
 import 'package:intl/intl.dart';
 
-/// ─── Orderlli POS · Currency Formatter ──────────────────────────────────────
+/// ─── Orderlyy POS · Currency Formatter ──────────────────────────────────────
 ///
-/// Centralized, locale-aware INR currency formatter for the Orderlli POS.
+/// Centralized, locale-aware INR currency formatter for the Orderlyy POS.
 ///
 /// All money values in the app are formatted through this class.
 /// Never hardcode '₹' or currency strings directly in widget files.

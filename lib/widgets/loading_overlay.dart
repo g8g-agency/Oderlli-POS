@@ -3,7 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import '../theme/theme.dart';
 
-/// ─── Orderlli POS · Loading Overlay ──────────────────────────────────────────
+/// ─── Orderlyy POS · Loading Overlay ──────────────────────────────────────────
 ///
 /// A premium overlay component that blocks interactions while performing async tasks
 /// (e.g. sending orders, processing receipts). Displays a modal loading animation.

@@ -24,7 +24,7 @@ import '../screens/checkout/refunds_screen.dart';
 import '../screens/shell/main_shell.dart';
 import 'app_routes.dart';
 
-/// GoRouter configuration provider for the Orderlli POS.
+/// GoRouter configuration provider for the Orderlyy POS.
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
 

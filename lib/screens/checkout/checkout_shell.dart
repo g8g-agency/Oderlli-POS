@@ -9,7 +9,7 @@ import '../../widgets/widgets.dart';
 import '../../providers/providers.dart';
 import '../../core/extensions/extensions.dart';
 
-/// ─── Orderlli POS · Checkout Shell ──────────────────────────────────────────
+/// ─── Orderlyy POS · Checkout Shell ──────────────────────────────────────────
 ///
 /// Nested Shell layout for the Checkout/Payment flow.
 /// Persistently displays the receipt summary on the left (40% width)

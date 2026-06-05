@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 abstract final class AppConfig {
   static const String devUrl = 'http://192.168.1.50:3001/api/v1';
-  static const String prodUrl = 'https://api.orderlli.com/api/v1';
+  static const String prodUrl = 'https://api.orderlyy.com/api/v1';
   static const String healthEndpoint = '/health';
 
   static String get baseUrl => kDebugMode ? devUrl : prodUrl;

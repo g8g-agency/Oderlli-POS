@@ -22,13 +22,13 @@ void main() async {
 
   runApp(
     const ProviderScope(
-      child: OrderlliApp(),
+      child: OrderlyyApp(),
     ),
   );
 }
 
-class OrderlliApp extends ConsumerWidget {
-  const OrderlliApp({super.key});
+class OrderlyyApp extends ConsumerWidget {
+  const OrderlyyApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,7 +45,7 @@ class OrderlliApp extends ConsumerWidget {
       builder: (context, child) {
         return InteractionListener(
           child: MaterialApp.router(
-            title: 'Orderlli POS',
+            title: 'Orderlyy POS',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light,
             themeMode: ThemeMode.light,

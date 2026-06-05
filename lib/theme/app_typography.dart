@@ -3,7 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
-/// ─── Orderlli POS · Typography System ───────────────────────────────────────
+/// ─── Orderlyy POS · Typography System ───────────────────────────────────────
 ///
 /// Responsive typography configurations using Google Fonts (Inter).
 /// Font sizes are defined using ScreenUtil `.sp` units to ensure perfect scaling

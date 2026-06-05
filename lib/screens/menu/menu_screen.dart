@@ -270,7 +270,7 @@ class MenuScreen extends ConsumerWidget {
         backgroundColor: LightPOSColors.background,
         appBar: AppBar(
           backgroundColor: LightPOSColors.sidebarBg,
-          title: Text('Orderlli POS', style: LightPOSTypography.headlineMedium),
+          title: Text('Orderlyy POS', style: LightPOSTypography.headlineMedium),
           iconTheme: const IconThemeData(color: LightPOSColors.textPrimary),
           elevation: 0,
         ),
@@ -362,7 +362,7 @@ class POSSidebar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Orderlli',
+                      'Orderlyy',
                       style: LightPOSTypography.titleLarge.copyWith(fontWeight: FontWeight.w800),
                     ),
                     const StatusIndicator(),

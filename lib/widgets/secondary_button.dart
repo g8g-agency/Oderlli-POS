@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../theme/theme.dart';
 
-/// ─── Orderlli POS · Secondary Button ────────────────────────────────────────
+/// ─── Orderlyy POS · Secondary Button ────────────────────────────────────────
 ///
 /// Tablet-optimized secondary action button with a large touch target (52px height)
 /// and flat outline design. Commonly used for auxiliary tasks.

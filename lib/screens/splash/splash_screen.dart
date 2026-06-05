@@ -81,7 +81,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 Gap(24.h),
                 Text(
-                  'Orderlli',
+                  'Orderlyy',
                   style: AppTextStyles.displayMedium.copyWith(
                     color: Colors.white,
                     letterSpacing: -1,

@@ -8,7 +8,7 @@ import 'package:gap/gap.dart';
 import '../theme/theme.dart';
 import '../providers/pos_alerts_provider.dart';
 
-// ─── Orderlli POS · Operational Alert Overlay ────────────────────────────────
+// ─── Orderlyy POS · Operational Alert Overlay ────────────────────────────────
 //
 // Renders a layered set of non-blocking operational alerts over the POS UI:
 //

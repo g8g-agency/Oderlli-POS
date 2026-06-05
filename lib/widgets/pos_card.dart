@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../theme/theme.dart';
 
-/// ─── Orderlli POS · POS Card ────────────────────────────────────────────────
+/// ─── Orderlyy POS · POS Card ────────────────────────────────────────────────
 ///
 /// A premium container component matching the dark operational system scheme.
 /// Supports selection highlighting, custom borders, paddings, and tap handlers.

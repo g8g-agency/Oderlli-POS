@@ -33,7 +33,7 @@ class MainShell extends ConsumerWidget {
           title: Row(
             children: [
               Text(
-                'Orderlli POS',
+                'Orderlyy POS',
                 style: AppTextStyles.headlineSmall.copyWith(
                   color: AppColors.textPrimary,
                   fontSize: 18.sp,
@@ -287,7 +287,7 @@ class _SidebarLogo extends StatelessWidget {
           Gap(10.w),
           Expanded(
             child: Text(
-              'Orderlli',
+              'Orderlyy',
               style: AppTextStyles.headlineSmall.copyWith(
                 color: AppColors.primary,
                 fontSize: 18.sp,

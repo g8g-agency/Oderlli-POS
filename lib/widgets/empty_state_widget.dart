@@ -3,7 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import '../theme/theme.dart';
 
-/// ─── Orderlli POS · Empty State Widget ──────────────────────────────────────
+/// ─── Orderlyy POS · Empty State Widget ──────────────────────────────────────
 ///
 /// A premium empty state layout displaying an icon, headline, supporting text,
 /// and an optional custom action button. Perfect for unoccupied tables, empty carts,

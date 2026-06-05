@@ -3,7 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import '../theme/theme.dart';
 
-/// ─── Orderlli POS · Section Header ──────────────────────────────────────────
+/// ─── Orderlyy POS · Section Header ──────────────────────────────────────────
 ///
 /// Standardized header layout for sections (e.g. Menu categories, active lists).
 /// Displays a title, an optional counts badge, and a trailing action.
