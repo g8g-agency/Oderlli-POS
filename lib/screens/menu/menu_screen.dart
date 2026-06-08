@@ -228,11 +228,10 @@ class MenuScreen extends ConsumerWidget {
                             ? 4
                             : (width > 900 ? 3 : 2));
                     // Dynamically calculate aspect ratio so card details never overflow
-                    final childAspectRatio = width > 1600
-                        ? 0.85
-                        : (width > 1200
-                            ? 0.86
-                            : (width > 900 ? 0.88 : 0.85));
+                    final cardWidth = (width - 32.r - (crossAxisCount - 1) * 12.w) / crossAxisCount;
+                    // Ensure card height is at least 195.h to prevent vertical layout overflows in the details container
+                    final cardHeight = (cardWidth * 1.15).clamp(195.h, 240.h);
+                    final childAspectRatio = cardWidth / cardHeight;
 
                     return GridView.builder(
                       padding: EdgeInsets.all(16.r),
@@ -314,9 +313,9 @@ class MenuScreen extends ConsumerWidget {
           // Divider
           Container(width: 1.w, color: LightPOSColors.border),
 
-          // ── 3. Active Checkout Cart Panel (Right) — flex 2 scales responsively ─
-          Flexible(
-            flex: 2,
+          // ── 3. Active Checkout Cart Panel (Right) — fixed width for robust landscape proportions
+          SizedBox(
+            width: AppLayoutConstants.orderPanelWidth.w,
             child: OrderCartPanel(
               cartState: cartState,
               activeTable: activeTable,
@@ -767,7 +766,6 @@ class MenuItemCard extends StatelessWidget {
             children: [
               // Image / Emoji Area
               Expanded(
-                flex: 11,
                 child: Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
@@ -833,14 +831,13 @@ class MenuItemCard extends StatelessWidget {
               
               // Details
               Expanded(
-                flex: 9,
                 child: Padding(
                   padding: EdgeInsets.all(AppSpacing.sm.r),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      SizedBox(
-                        height: 38.h,
+                      Flexible(
                         child: Text(
                           item.name,
                           style: LightPOSTypography.titleMedium,
@@ -848,7 +845,6 @@ class MenuItemCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Spacer(),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -867,7 +863,7 @@ class MenuItemCard extends StatelessWidget {
                               backgroundColor: LightPOSColors.primary,
                               minimumSize: Size(36.w, 36.h),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusSM.r),
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusSM.r),
                               ),
                               padding: EdgeInsets.zero,
                             ),

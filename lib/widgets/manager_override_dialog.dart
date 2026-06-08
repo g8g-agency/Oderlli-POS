@@ -17,6 +17,7 @@ class _ManagerOverrideDialogState extends State<ManagerOverrideDialog> {
   String _pin = '';
   bool _isError = false;
   bool _isLoading = false;
+  bool _isPopped = false;
 
   void _onKeyPress(String val) {
     if (_pin.length < 4 && !_isLoading) {
@@ -58,7 +59,8 @@ class _ManagerOverrideDialogState extends State<ManagerOverrideDialog> {
 
     // Alexander is the Manager with PIN '1111'
     if (_pin == '1111') {
-      if (mounted) {
+      if (mounted && !_isPopped) {
+        _isPopped = true;
         Navigator.pop(context, true);
       }
     } else {
@@ -182,7 +184,12 @@ class _ManagerOverrideDialogState extends State<ManagerOverrideDialog> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: _isLoading ? null : () => Navigator.pop(context, false),
+                    onPressed: _isLoading ? null : () {
+                      if (!_isPopped) {
+                        _isPopped = true;
+                        Navigator.pop(context, false);
+                      }
+                    },
                     style: OutlinedButton.styleFrom(
                       minimumSize: Size(double.infinity, 44.h),
                       shape: RoundedRectangleBorder(

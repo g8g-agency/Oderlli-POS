@@ -7,6 +7,8 @@ import '../core/utils/role_permissions.dart';
 
 import '../screens/splash/splash_screen.dart';
 import '../screens/login/login_screen.dart';
+import '../screens/login/branch_selection_screen.dart';
+import '../screens/login/employee_login_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/floor/floor_screen.dart';
 import '../screens/orders/orders_screen.dart';
@@ -24,33 +26,63 @@ import '../screens/checkout/refunds_screen.dart';
 import '../screens/shell/main_shell.dart';
 import 'app_routes.dart';
 
+class RouterRefreshListenable extends ChangeNotifier {
+  RouterRefreshListenable(Ref ref) {
+    ref.listen(authProvider, (prev, next) {
+      notifyListeners();
+    });
+  }
+}
+
+final routerRefreshListenableProvider = Provider<RouterRefreshListenable>((ref) {
+  return RouterRefreshListenable(ref);
+});
+
 /// GoRouter configuration provider for the Orderlyy POS.
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  final refreshListenable = ref.watch(routerRefreshListenableProvider);
 
   return GoRouter(
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: true,
+    refreshListenable: refreshListenable,
     redirect: (context, state) {
-      final isLoggedIn = authState.user != null;
-      final isLocked = authState.isLocked;
-      final isLoggingIn = state.uri.path == AppRoutes.login;
-      final isSplash = state.uri.path == AppRoutes.splash;
+      final authState = ref.read(authProvider);
+      final isOrgAuthenticated = authState.isOrgAuthenticated;
+      final hasBranchSelected = authState.branchId != null && authState.branchId!.isNotEmpty;
+      final isEmployeeLoggedIn = authState.user != null;
 
-      // Handle lock screen and unauthenticated routing
-      if (!isLoggedIn) {
-        if (isLocked) {
-          if (!isLoggingIn) return AppRoutes.login;
-          return null; // Stay on login page to display the lock overlay
-        }
-        if (!isLoggingIn && !isSplash) {
+      final isSplash = state.uri.path == AppRoutes.splash;
+      final isLogin = state.uri.path == AppRoutes.login;
+      final isSelectBranch = state.uri.path == AppRoutes.selectBranch;
+      final isEmployeeLogin = state.uri.path == AppRoutes.employeeLogin;
+
+      // 1. If not authenticated at the organization level, redirect to /login
+      if (!isOrgAuthenticated) {
+        if (!isLogin && !isSplash) {
           return AppRoutes.login;
         }
         return null;
       }
 
-      // Redirect authenticated users away from Splash and Login
-      if (isSplash || isLoggingIn) {
+      // 2. If organization is authenticated but no branch is selected, redirect to /select-branch
+      if (!hasBranchSelected) {
+        if (!isSelectBranch) {
+          return AppRoutes.selectBranch;
+        }
+        return null;
+      }
+
+      // 3. If branch is selected but no employee is logged in (or locked), redirect to /employee-login
+      if (!isEmployeeLoggedIn) {
+        if (!isEmployeeLogin) {
+          return AppRoutes.employeeLogin;
+        }
+        return null;
+      }
+
+      // 4. Redirect fully authenticated users away from Splash and Login/Select Branch screens
+      if (isSplash || isLogin || isSelectBranch || isEmployeeLogin) {
         return AppRoutes.dashboard;
       }
 
@@ -101,6 +133,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.login,
         name: 'login',
         builder: (context, state) => const LoginScreen(),
+      ),
+
+      // ── Select Branch ─────────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.selectBranch,
+        name: 'select-branch',
+        builder: (context, state) => const BranchSelectionScreen(),
+      ),
+
+      // ── Employee Login ────────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.employeeLogin,
+        name: 'employee-login',
+        builder: (context, state) => const EmployeeLoginScreen(),
       ),
 
       // ── Main Shell with Persistent Sidebar Navigation ─────────────────────

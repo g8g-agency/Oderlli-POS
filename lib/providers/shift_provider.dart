@@ -2,59 +2,71 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
+import 'auth_provider.dart';
 
 /// Provider for managing POS active/closed shifts.
 final shiftProvider = StateNotifierProvider<ShiftNotifier, ShiftSession>((ref) {
-  final notifier = ShiftNotifier();
+  final notifier = ShiftNotifier(ref);
   notifier.loadSession();
   return notifier;
 });
 
 class ShiftNotifier extends StateNotifier<ShiftSession> {
   static const _prefKey = 'active_shift_session';
+  final Ref _ref;
 
-  ShiftNotifier() : super(_initialSession());
+  ShiftNotifier(this._ref) : super(_initialSession(null)) {
+    // Listen to auth state to update cashier name when user logs in
+    _ref.listen<AuthState>(authProvider, (previous, next) {
+      if (next.user != null) {
+        final newName = next.user!.name;
+        if (state.cashierName != newName) {
+          state = state.copyWith(
+            cashierName: newName,
+            activities: state.activities.map((act) {
+              if (act.performedBy == 'Staff' || act.performedBy == 'Alexander') {
+                return ShiftActivity(
+                  id: act.id,
+                  type: act.type,
+                  timestamp: act.timestamp,
+                  amount: act.amount,
+                  title: act.title,
+                  subtitle: act.subtitle,
+                  performedBy: newName,
+                );
+              }
+              return act;
+            }).toList(),
+          );
+          _saveSession();
+        }
+      }
+    });
+  }
 
-  static ShiftSession _initialSession() {
+  static ShiftSession _initialSession(String? cashierName) {
     final now = DateTime.now();
+    final name = cashierName ?? 'Staff';
     return ShiftSession(
       shiftId: 'shift-${now.millisecondsSinceEpoch}',
-      terminalId: 'TER-01',
-      cashierName: 'Alexander',
-      shiftStart: now.subtract(const Duration(hours: 4, minutes: 30)),
-      openingCash: 15000.0,
-      netCashSales: 43550.0,
-      payouts: 4500.0,
+      terminalId: 'Main Terminal',
+      cashierName: name,
+      shiftStart: now,
+      openingCash: 5000.0,
+      netCashSales: 0.0,
+      payouts: 0.0,
       cashInTotal: 0.0,
       cashDropTotal: 0.0,
       isShiftActive: true,
       activities: [
         ShiftActivity(
-          id: 'act-init-1',
-          type: ShiftTransactionType.payout,
-          timestamp: now.subtract(const Duration(minutes: 60)),
-          amount: -4500.0,
-          title: 'Cash Out / Payout',
-          subtitle: 'Supplier pay (Fresh veg)',
-          performedBy: 'Alexander',
-        ),
-        ShiftActivity(
-          id: 'act-init-2',
-          type: ShiftTransactionType.cashIn,
-          timestamp: now.subtract(const Duration(hours: 2, minutes: 18)),
-          amount: 8420.0,
-          title: 'Cash Sale',
-          subtitle: 'Bill #23048',
-          performedBy: 'Alexander',
-        ),
-        ShiftActivity(
           id: 'act-init-3',
           type: ShiftTransactionType.shiftOpened,
-          timestamp: now.subtract(const Duration(hours: 4, minutes: 30)),
-          amount: 15000.0,
+          timestamp: now,
+          amount: 5000.0,
           title: 'Shift Opened',
           subtitle: 'Opening drawer verify',
-          performedBy: 'Alexander',
+          performedBy: name,
         ),
       ],
     );
@@ -65,12 +77,52 @@ class ShiftNotifier extends StateNotifier<ShiftSession> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final dataStr = prefs.getString(_prefKey);
+      final authState = _ref.read(authProvider);
+      final currentUserName = authState.user?.name ?? authState.lockedUser?.name;
+
       if (dataStr != null) {
         final decoded = jsonDecode(dataStr) as Map<String, dynamic>;
-        state = ShiftSession.fromJson(decoded);
+        final loadedSession = ShiftSession.fromJson(decoded);
+
+        // Discard any session that contains mock activities or is owned by Alexander
+        final containsMock = loadedSession.activities.any((a) =>
+            a.title.contains('Fresh veg') ||
+            a.subtitle.contains('Fresh veg') ||
+            a.performedBy == 'Alexander');
+
+        if (containsMock) {
+          state = _initialSession(currentUserName);
+          await _saveSession();
+        } else {
+          // If cashierName is 'Staff' or 'Alexander', update it to the logged in user if available
+          if ((loadedSession.cashierName == 'Staff' || loadedSession.cashierName == 'Alexander') && currentUserName != null) {
+            state = loadedSession.copyWith(
+              cashierName: currentUserName,
+              activities: loadedSession.activities.map((act) {
+                if (act.performedBy == 'Staff' || act.performedBy == 'Alexander') {
+                  return ShiftActivity(
+                    id: act.id,
+                    type: act.type,
+                    timestamp: act.timestamp,
+                    amount: act.amount,
+                    title: act.title,
+                    subtitle: act.subtitle,
+                    performedBy: currentUserName,
+                  );
+                }
+                return act;
+              }).toList(),
+            );
+            await _saveSession();
+          } else {
+            state = loadedSession;
+          }
+        }
+      } else {
+        state = _initialSession(currentUserName);
       }
     } catch (e) {
-      // Fallback silently to initial session if storage fails
+      // Fallback silently if storage fails
     }
   }
 
@@ -82,6 +134,27 @@ class ShiftNotifier extends StateNotifier<ShiftSession> {
     } catch (e) {
       // Fallback silently if storage fails
     }
+  }
+
+  /// Logs a cash sale to the drawer and updates netCashSales.
+  void addCashSale(double amount, String orderNumber) {
+    if (amount <= 0) return;
+    final now = DateTime.now();
+    final newActivity = ShiftActivity(
+      id: 'tx-${now.millisecondsSinceEpoch}',
+      type: ShiftTransactionType.cashIn,
+      timestamp: now,
+      amount: amount,
+      title: 'Cash Sale',
+      subtitle: 'Order #$orderNumber',
+      performedBy: state.cashierName,
+    );
+
+    state = state.copyWith(
+      netCashSales: state.netCashSales + amount,
+      activities: [newActivity, ...state.activities],
+    );
+    _saveSession();
   }
 
   /// Appends a payout expense and updates total payouts.
@@ -190,7 +263,9 @@ class ShiftNotifier extends StateNotifier<ShiftSession> {
 
   /// Resets the shift session back to initial values (starts a new shift).
   Future<void> startNewShift() async {
-    state = _initialSession();
+    final authState = _ref.read(authProvider);
+    final currentUserName = authState.user?.name ?? authState.lockedUser?.name;
+    state = _initialSession(currentUserName);
     await _saveSession();
   }
 }

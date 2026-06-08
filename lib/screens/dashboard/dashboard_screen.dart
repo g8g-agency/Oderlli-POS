@@ -5,7 +5,6 @@ import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/theme.dart';
-import '../../mock/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../core/extensions/extensions.dart';
@@ -219,9 +218,14 @@ class _TopBar extends ConsumerWidget {
     final displayName = user?.name ?? 'Alexander';
     final displayRole = user?.role ?? UserRole.manager;
     final greeting = ref.watch(greetingProvider);
+    final authState = ref.watch(authProvider);
+    final shiftState = ref.watch(shiftProvider);
+    
+    final branchName = authState.branchName ?? 'Main Branch';
+    final isShiftActive = shiftState.isShiftActive;
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.borderSubtle)),
@@ -244,6 +248,21 @@ class _TopBar extends ConsumerWidget {
                     Text(
                       'Dashboard',
                       style: AppTextStyles.dashboardTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Gap(8.w),
+                    Text(
+                      '·',
+                      style: AppTextStyles.dashboardTitle.copyWith(color: AppColors.textSecondary),
+                    ),
+                    Gap(8.w),
+                    Text(
+                      branchName,
+                      style: AppTextStyles.dashboardTitle.copyWith(
+                        color: const Color(0xFFBA0013),
+                        fontWeight: FontWeight.w700,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -279,6 +298,44 @@ class _TopBar extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    Gap(8.w),
+                    // Shift Status Chip
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 2.h),
+                      decoration: BoxDecoration(
+                        color: isShiftActive 
+                            ? AppColors.success.withValues(alpha: 0.12)
+                            : AppColors.error.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(100.r),
+                        border: Border.all(
+                          color: isShiftActive 
+                              ? AppColors.success.withValues(alpha: 0.24)
+                              : AppColors.error.withValues(alpha: 0.24),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6.r,
+                            height: 6.r,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isShiftActive ? AppColors.success : AppColors.error,
+                            ),
+                          ),
+                          Gap(6.w),
+                          Text(
+                            isShiftActive ? 'SHIFT ACTIVE' : 'SHIFT CLOSED',
+                            style: AppTypography.labelSmall.copyWith(
+                              color: isShiftActive ? AppColors.success : AppColors.error,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 9.sp,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -298,7 +355,7 @@ class _TopBar extends ConsumerWidget {
             onTap: () {
               // Click avatar to quickly lock terminal session
               ref.read(authProvider.notifier).lock();
-              context.go('/login');
+              context.go('/employee-login');
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Terminal locked.')),
               );
@@ -351,7 +408,7 @@ class _TopBarAvatar extends StatelessWidget {
 
 // ── Stats row ────────────────────────────────────────────────────────────────
 
-class _StatsRow extends StatelessWidget {
+class _StatsRow extends ConsumerWidget {
   const _StatsRow({
     required this.role,
     required this.occupiedCount,
@@ -365,13 +422,26 @@ class _StatsRow extends StatelessWidget {
   final int activeOrders;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isVertical = context.isVerticalLayout;
-    final stats = MockData.dashboardStats;
+    final orders = ref.watch(ordersProvider);
+
+    final now = DateTime.now();
+    final todayOrders = orders.where((o) {
+      final isSameDay = o.createdAt.year == now.year &&
+          o.createdAt.month == now.month &&
+          o.createdAt.day == now.day;
+      // Use completed/served orders only for actual revenue
+      final isCompleted = o.status == OrderStatus.served || o.status == OrderStatus.completed;
+      return isSameDay && isCompleted;
+    }).toList();
+
+    final totalRevenue = todayOrders.fold<double>(0.0, (sum, o) => sum + o.total);
+    final avgOrderValue = todayOrders.isEmpty ? 0.0 : totalRevenue / todayOrders.length;
 
     final revenueTile = MetricTile(
       label: 'Today\'s Revenue',
-      value: (stats['totalRevenue'] as double).asCurrency,
+      value: totalRevenue.asCurrency,
       icon: Icons.currency_rupee,
       color: AppColors.success,
     );
@@ -392,7 +462,7 @@ class _StatsRow extends StatelessWidget {
 
     final aovTile = MetricTile(
       label: 'Avg. Order Value',
-      value: (stats['avgOrderValue'] as double).asCurrency,
+      value: avgOrderValue.asCurrency,
       icon: Icons.trending_up,
       color: AppColors.cash,
     );

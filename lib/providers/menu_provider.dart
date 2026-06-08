@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
-import '../mock/mock_data.dart';
 import '../core/services/menu_service.dart';
 import '../core/repositories/menu_repository.dart';
 import 'auth_provider.dart';
@@ -23,21 +21,9 @@ final menuRepositoryProvider = Provider<MenuRepository>((ref) {
 // Reads tenantId and branchId from the restored BackendUser stored in
 // secure storage. Falls back to null when offline / no session.
 
-final _sessionIdsProvider = FutureProvider<({String? tenantId, String? branchId})>((ref) async {
-  final secureStorage = ref.watch(secureStorageProvider);
-  final credentials = await secureStorage.getCredentials();
-  final userJson = credentials['userJson'];
-  if (userJson == null) return (tenantId: null, branchId: null);
-  try {
-    final decoded = jsonDecode(userJson) as Map<String, dynamic>;
-    final backendUser = BackendUser.fromJson(decoded);
-    final tenantId = backendUser.tenantId;
-    final branchId = backendUser.branchIds.isNotEmpty ? backendUser.branchIds.first : null;
-    return (tenantId: tenantId, branchId: branchId);
-  } catch (e) {
-    if (kDebugMode) debugPrint('[menuProvider] Could not parse stored user: $e');
-    return (tenantId: null, branchId: null);
-  }
+final _sessionIdsProvider = Provider<({String? tenantId, String? branchId})>((ref) {
+  final authState = ref.watch(authProvider);
+  return (tenantId: authState.tenantId, branchId: authState.branchId);
 });
 
 // ─── Categories ───────────────────────────────────────────────
@@ -51,15 +37,11 @@ final categoriesProvider = AsyncNotifierProvider<_CategoriesNotifier, List<Categ
 class _CategoriesNotifier extends AsyncNotifier<List<Category>> {
   @override
   Future<List<Category>> build() async {
-    final ids = await ref.watch(_sessionIdsProvider.future);
+    final ids = ref.watch(_sessionIdsProvider);
     final tenantId = ids.tenantId;
 
     if (tenantId == null) {
-      if (kDebugMode) {
-        debugPrint('[MenuProvider] No tenantId — using mock categories');
-        return MockData.categories;
-      }
-      return MockData.categories;
+      throw Exception('No tenantId context configured. Please verify your login session.');
     }
 
     try {
@@ -67,8 +49,7 @@ class _CategoriesNotifier extends AsyncNotifier<List<Category>> {
       return await repo.fetchCategories(tenantId);
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[MenuProvider] fetchCategories failed ($e) — falling back to mock');
-        return MockData.categories;
+        debugPrint('[MenuProvider] fetchCategories failed: $e');
       }
       rethrow;
     }
@@ -86,16 +67,12 @@ final menuItemsProvider = AsyncNotifierProvider<_MenuItemsNotifier, List<MenuIte
 class _MenuItemsNotifier extends AsyncNotifier<List<MenuItem>> {
   @override
   Future<List<MenuItem>> build() async {
-    final ids = await ref.watch(_sessionIdsProvider.future);
+    final ids = ref.watch(_sessionIdsProvider);
     final tenantId = ids.tenantId;
     final branchId = ids.branchId;
 
     if (tenantId == null || branchId == null) {
-      if (kDebugMode) {
-        debugPrint('[MenuProvider] No tenantId/branchId — using mock menu items');
-        return MockData.menuItems;
-      }
-      return MockData.menuItems;
+      throw Exception('No tenantId/branchId context configured. Please verify your login session.');
     }
 
     try {
@@ -103,8 +80,7 @@ class _MenuItemsNotifier extends AsyncNotifier<List<MenuItem>> {
       return await repo.fetchMenuItems(tenantId, branchId);
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[MenuProvider] fetchMenuItems failed ($e) — falling back to mock');
-        return MockData.menuItems;
+        debugPrint('[MenuProvider] fetchMenuItems failed: $e');
       }
       rethrow;
     }

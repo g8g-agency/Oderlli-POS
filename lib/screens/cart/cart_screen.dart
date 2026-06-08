@@ -318,9 +318,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                return;
                              }
 
-                             final sessionIds = ref.read(cartSessionIdsProvider).valueOrNull;
-                             final tenantId = sessionIds?.tenantId ?? 'tenant-mock';
-                             final branchId = sessionIds?.branchId ?? 'branch-mock';
+                             final sessionIds = ref.read(cartSessionIdsProvider);
+                             final tenantId = sessionIds.tenantId ?? 'tenant-mock';
+                             final branchId = sessionIds.branchId ?? 'branch-mock';
                              final cartId = cartState.backendCartId ?? 'cart-placeholder';
 
                              try {

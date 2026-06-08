@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
-import '../mock/mock_data.dart';
 import '../core/services/order_service.dart';
 import '../core/repositories/order_repository.dart';
 import '../core/repositories/cart_repository.dart';
@@ -43,13 +42,10 @@ class OrdersNotifier extends StateNotifier<List<Order>> {
   }
 
   Future<void> fetchOrders() async {
-    final sessionIds = ref.read(cartSessionIdsProvider).valueOrNull;
-    final branchId = sessionIds?.branchId;
+    final sessionIds = ref.read(cartSessionIdsProvider);
+    final branchId = sessionIds.branchId;
     if (branchId == null) {
-      if (kDebugMode) {
-        state = MockData.orders;
-      }
-      return;
+      throw Exception('No branchId context configured. Please verify your login session.');
     }
 
     try {
@@ -84,8 +80,9 @@ class OrdersNotifier extends StateNotifier<List<Order>> {
       state = orderList;
     } catch (e) {
       if (kDebugMode) {
-        state = MockData.orders;
+        debugPrint('[OrdersNotifier] fetchOrders failed: $e');
       }
+      rethrow;
     }
   }
 

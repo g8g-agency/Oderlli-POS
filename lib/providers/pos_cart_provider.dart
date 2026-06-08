@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/services/cart_service.dart';
@@ -115,21 +114,9 @@ final cartRepositoryProvider = Provider<CartRepository>((ref) {
   return CartRepository(service, conn);
 });
 
-final cartSessionIdsProvider = FutureProvider<({String? tenantId, String? branchId})>((ref) async {
-  final secureStorage = ref.watch(secureStorageProvider);
-  final credentials = await secureStorage.getCredentials();
-  final userJson = credentials['userJson'];
-  if (userJson == null) return (tenantId: null, branchId: null);
-  try {
-    final decoded = jsonDecode(userJson) as Map<String, dynamic>;
-    final backendUser = BackendUser.fromJson(decoded);
-    final tenantId = backendUser.tenantId;
-    final branchId = backendUser.branchIds.isNotEmpty ? backendUser.branchIds.first : null;
-    return (tenantId: tenantId, branchId: branchId);
-  } catch (e) {
-    if (kDebugMode) debugPrint('[cartSessionIdsProvider] Could not parse stored user: $e');
-    return (tenantId: null, branchId: null);
-  }
+final cartSessionIdsProvider = Provider<({String? tenantId, String? branchId})>((ref) {
+  final authState = ref.watch(authProvider);
+  return (tenantId: authState.tenantId, branchId: authState.branchId);
 });
 
 // ─── POS Cart Notifier ────────────────────────────────────────────────────────
@@ -451,14 +438,14 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
 
 final posCartProvider = StateNotifierProvider<POSCartNotifier, POSCartState>((ref) {
   final repository = ref.watch(cartRepositoryProvider);
-  final sessionIds = ref.watch(cartSessionIdsProvider).valueOrNull;
+  final sessionIds = ref.watch(cartSessionIdsProvider);
   final selectedTableId = ref.watch(cartSelectedTableProvider);
 
   final notifier = POSCartNotifier(
     ref: ref,
     repository: repository,
-    tenantId: sessionIds?.tenantId,
-    branchId: sessionIds?.branchId,
+    tenantId: sessionIds.tenantId,
+    branchId: sessionIds.branchId,
     tableId: selectedTableId,
   );
 

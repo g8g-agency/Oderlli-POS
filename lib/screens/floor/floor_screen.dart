@@ -310,8 +310,8 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
           if (table.status == POSTableStatus.available) ...[
             PrimaryButton(
               onPressed: () {
-                // Seat table (mock Sarah waiter, 2 guests)
-                ref.read(posTablesProvider.notifier).seatTable(table.id, 2, 'Sarah');
+                final currentUserName = ref.read(authProvider).user?.name ?? 'Sarah';
+                ref.read(posTablesProvider.notifier).seatTable(table.id, 2, currentUserName);
                 ref.read(activeTableIdProvider.notifier).state = table.id;
                 setState(() => _selectedTable = null);
               },
@@ -321,6 +321,8 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
             Gap(12.h),
             SecondaryButton(
               onPressed: () {
+                final currentUserName = ref.read(authProvider).user?.name ?? 'Sarah';
+                ref.read(posTablesProvider.notifier).seatTable(table.id, 2, currentUserName);
                 ref.read(activeTableIdProvider.notifier).state = table.id;
                 context.go('/menu');
               },

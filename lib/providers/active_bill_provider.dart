@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import 'orders_provider.dart';
 import 'table_provider.dart';
+import 'shift_provider.dart';
 
 /// Tracks the active table being checked out.
 final activeTableIdProvider = StateProvider<String?>((ref) => null);
@@ -113,22 +114,9 @@ class ActiveBillNotifier extends StateNotifier<ActiveBillState?> {
     if (state?.order.id == order.id) {
       state = state!.copyWith(order: order);
     } else {
-      // Mock past partial payment for Table 2 (Sarah) to make "Partially Paid" visible
-      final initialPayments = order.tableNumber == 2
-          ? [
-              PaymentRecord(
-                id: 'pay-101',
-                method: 'Cash',
-                amount: 20.00,
-                timestamp: DateTime.now().subtract(const Duration(minutes: 10)),
-                waiterName: order.servedBy ?? 'Sarah',
-              )
-            ]
-          : const <PaymentRecord>[];
-
       state = ActiveBillState(
         order: order,
-        payments: initialPayments,
+        payments: const <PaymentRecord>[],
       );
     }
   }
@@ -157,6 +145,14 @@ class ActiveBillNotifier extends StateNotifier<ActiveBillState?> {
       );
       final updatedPayments = [...currentState.payments, newPayment];
       state = currentState.copyWith(payments: updatedPayments);
+
+      // Add to shift drawer if paid in Cash
+      if (method == 'Cash') {
+        _ref.read(shiftProvider.notifier).addCashSale(
+              amount,
+              currentState.order.orderNumber ?? currentState.order.id,
+            );
+      }
 
       final newRemaining = currentState.total - (currentState.amountPaid + amount);
       if (newRemaining <= 0.01) {

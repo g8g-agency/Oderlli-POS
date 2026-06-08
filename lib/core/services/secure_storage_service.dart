@@ -1,36 +1,95 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_config.dart';
 
 class SecureStorageService {
   final _storage = const FlutterSecureStorage();
+
+  Future<void> _write(String key, String value) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, value);
+    } else {
+      try {
+        await _storage.write(key: key, value: value);
+      } catch (e) {
+        if (kDebugMode) debugPrint('[SecureStorageService] Error writing to secure storage: $e');
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('fallback_$key', value);
+    }
+  }
+
+  Future<String?> _read(String key) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(key);
+    } else {
+      String? value;
+      try {
+        value = await _storage.read(key: key);
+      } catch (e) {
+        if (kDebugMode) debugPrint('[SecureStorageService] Error reading from secure storage: $e');
+      }
+      if (value == null || value.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        value = prefs.getString('fallback_$key');
+      }
+      return value;
+    }
+  }
+
+  Future<void> _delete(String key) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(key);
+    } else {
+      try {
+        await _storage.delete(key: key);
+      } catch (e) {
+        if (kDebugMode) debugPrint('[SecureStorageService] Error deleting from secure storage: $e');
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('fallback_$key');
+    }
+  }
 
   Future<void> saveTokens({
     required String accessToken,
     required String refreshToken,
     required String deviceSessionId,
   }) async {
-    await _storage.write(key: AppConfig.accessTokenKey, value: accessToken);
-    await _storage.write(key: AppConfig.refreshTokenKey, value: refreshToken);
-    await _storage.write(key: AppConfig.deviceSessionIdKey, value: deviceSessionId);
+    await _write(AppConfig.accessTokenKey, accessToken);
+    await _write(AppConfig.refreshTokenKey, refreshToken);
+    await _write(AppConfig.deviceSessionIdKey, deviceSessionId);
+    debugPrint('[AUTH] TOKEN SAVED: $accessToken');
   }
 
   Future<void> saveUserJson(String userJson) async {
-    await _storage.write(key: AppConfig.authUserKey, value: userJson);
+    await _write(AppConfig.authUserKey, userJson);
   }
 
   Future<Map<String, String?>> getCredentials() async {
+    final accessToken = await _read(AppConfig.accessTokenKey);
+    final refreshToken = await _read(AppConfig.refreshTokenKey);
+    final deviceSessionId = await _read(AppConfig.deviceSessionIdKey);
+    final userJson = await _read(AppConfig.authUserKey);
+
+    debugPrint('[AUTH] TOKEN READ: $accessToken');
+
     return {
-      'accessToken': await _storage.read(key: AppConfig.accessTokenKey),
-      'refreshToken': await _storage.read(key: AppConfig.refreshTokenKey),
-      'deviceSessionId': await _storage.read(key: AppConfig.deviceSessionIdKey),
-      'userJson': await _storage.read(key: AppConfig.authUserKey),
+      'accessToken': accessToken,
+      'refreshToken': refreshToken,
+      'deviceSessionId': deviceSessionId,
+      'userJson': userJson,
     };
   }
 
   Future<void> clearSession() async {
-    await _storage.delete(key: AppConfig.accessTokenKey);
-    await _storage.delete(key: AppConfig.refreshTokenKey);
-    await _storage.delete(key: AppConfig.deviceSessionIdKey);
-    await _storage.delete(key: AppConfig.authUserKey);
+    await _delete(AppConfig.accessTokenKey);
+    await _delete(AppConfig.refreshTokenKey);
+    await _delete(AppConfig.deviceSessionIdKey);
+    await _delete(AppConfig.authUserKey);
   }
 }

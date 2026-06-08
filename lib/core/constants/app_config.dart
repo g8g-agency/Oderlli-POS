@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 
 abstract final class AppConfig {
-  static const String devUrl = 'http://192.168.1.50:3001/api/v1';
+  static const String devUrl = kIsWeb
+      ? 'http://localhost:3001/api/v1'
+      : 'http://192.168.1.50:3001/api/v1';
   static const String prodUrl = 'https://api.orderlyy.com/api/v1';
   static const String healthEndpoint = '/health';
 
@@ -13,5 +15,5 @@ abstract final class AppConfig {
   static const String deviceSessionIdKey = 'device_session_id';
   static const String authUserKey = 'auth_user_json';
   
-  static const bool allowMockFallbackInDebug = true;
+  static const bool allowMockFallbackInDebug = false;
 }

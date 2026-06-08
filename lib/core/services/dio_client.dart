@@ -33,6 +33,12 @@ class DioClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Prevent duplicate /api/v1 when combined with baseUrl ending in /api/v1
+          if (options.path.startsWith('/api/v1') &&
+              (options.baseUrl.endsWith('/api/v1') || options.baseUrl.endsWith('/api/v1/'))) {
+            options.path = options.path.substring(7);
+          }
+
           // Inject Fingerprint header
           final fingerprint = await _fingerprintService.getOrCreateFingerprint();
           options.headers['X-Device-Fingerprint'] = fingerprint;
@@ -40,8 +46,12 @@ class DioClient {
           // Inject Access Token header (if available)
           final credentials = await _secureStorage.getCredentials();
           final accessToken = credentials['accessToken'];
+          debugPrint('[AUTH] getAccessToken returned: $accessToken');
           if (accessToken != null && accessToken.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $accessToken';
+            debugPrint('[AUTH] AUTHORIZATION HEADER ADDED: Bearer $accessToken');
+          } else {
+            debugPrint('[AUTH] AUTHORIZATION HEADER NOT ADDED (token is null/empty)');
           }
 
           if (kDebugMode) {

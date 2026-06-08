@@ -76,4 +76,32 @@ class AuthRepository {
       return null;
     }
   }
+
+  Future<List<BranchInfo>> fetchBranches() async {
+    return _authService.fetchBranches();
+  }
+
+  Future<List<PosUser>> fetchStaff({
+    required String tenantId,
+    required String branchId,
+  }) async {
+    return _authService.fetchStaff(
+      tenantId: tenantId,
+      branchId: branchId,
+    );
+  }
+
+  Future<PosUser> loginStaff({
+    required String tenantId,
+    required String branchId,
+    required String employeeId,
+    required String pin,
+  }) async {
+    return _authService.loginStaff(
+      tenantId: tenantId,
+      branchId: branchId,
+      employeeId: employeeId,
+      pin: pin,
+    );
+  }
 }

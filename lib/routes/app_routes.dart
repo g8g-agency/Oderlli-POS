@@ -3,6 +3,8 @@ abstract final class AppRoutes {
   // Splash / Authentication
   static const String splash = '/';
   static const String login = '/login';
+  static const String selectBranch = '/select-branch';
+  static const String employeeLogin = '/employee-login';
 
   // Top-level Dashboard / Side navigation routes
   static const String dashboard = '/dashboard';

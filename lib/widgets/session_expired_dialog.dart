@@ -27,6 +27,7 @@ class _SessionExpiredDialogState extends ConsumerState<SessionExpiredDialog>
   bool _isLoading = false;
   bool _isError = false;
   String? _errorMessage;
+  bool _isPopped = false;
 
   late final AnimationController _shakeController;
   late final Animation<double> _shakeAnimation;
@@ -93,8 +94,9 @@ class _SessionExpiredDialogState extends ConsumerState<SessionExpiredDialog>
 
     final success = await ref.read(authProvider.notifier).unlock(_pin);
 
-    if (mounted) {
+    if (mounted && !_isPopped) {
       if (success) {
+        _isPopped = true;
         navigator.pop();
       } else {
         final authState = ref.read(authProvider);
@@ -288,8 +290,11 @@ class _SessionExpiredDialogState extends ConsumerState<SessionExpiredDialog>
               TextButton(
                 onPressed: () async {
                   final navigator = Navigator.of(context);
+                  if (!_isPopped) {
+                    _isPopped = true;
+                    navigator.pop();
+                  }
                   await ref.read(authProvider.notifier).logout();
-                  navigator.pop();
                 },
                 child: Text(
                   'LOG OUT COMPLETELY',

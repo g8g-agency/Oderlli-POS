@@ -65,7 +65,39 @@ class BackendUser {
         fullName: (json['full_name'] ?? json['fullName']) as String,
         role: json['role'] as String,
         tenantId: (json['tenantId'] ?? json['tenant_id']) as String?,
-        branchIds: (json['branchIds'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
-        permissions: (json['permissions'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
+        branchIds: json['branchIds'] is List
+            ? (json['branchIds'] as List<dynamic>).map((e) => e as String).toList()
+            : [],
+        permissions: json['permissions'] is List
+            ? (json['permissions'] as List<dynamic>).map((e) => e as String).toList()
+            : [],
+      );
+}
+
+class BranchInfo {
+  final String id;
+  final String name;
+  final String timezone;
+  final String? tenantId;
+
+  const BranchInfo({
+    required this.id,
+    required this.name,
+    required this.timezone,
+    this.tenantId,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'timezone': timezone,
+        if (tenantId != null) 'tenantId': tenantId,
+      };
+
+  factory BranchInfo.fromJson(Map<String, dynamic> json) => BranchInfo(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        timezone: (json['timezone'] ?? 'UTC') as String,
+        tenantId: (json['tenantId'] ?? json['tenant_id']) as String?,
       );
 }

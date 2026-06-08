@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
-import '../mock/mock_pos_data.dart';
 import '../core/services/table_service.dart';
 import '../core/repositories/table_repository.dart';
 import 'auth_provider.dart';
@@ -21,21 +19,9 @@ final tableRepositoryProvider = Provider<TableRepository>((ref) {
   return TableRepository(service);
 });
 
-final _tablesSessionIdsProvider = FutureProvider<({String? tenantId, String? branchId})>((ref) async {
-  final secureStorage = ref.watch(secureStorageProvider);
-  final credentials = await secureStorage.getCredentials();
-  final userJson = credentials['userJson'];
-  if (userJson == null) return (tenantId: null, branchId: null);
-  try {
-    final decoded = jsonDecode(userJson) as Map<String, dynamic>;
-    final backendUser = BackendUser.fromJson(decoded);
-    final tenantId = backendUser.tenantId;
-    final branchId = backendUser.branchIds.isNotEmpty ? backendUser.branchIds.first : null;
-    return (tenantId: tenantId, branchId: branchId);
-  } catch (e) {
-    if (kDebugMode) debugPrint('[tablesProvider] Could not parse stored user: $e');
-    return (tenantId: null, branchId: null);
-  }
+final _tablesSessionIdsProvider = Provider<({String? tenantId, String? branchId})>((ref) {
+  final authState = ref.watch(authProvider);
+  return (tenantId: authState.tenantId, branchId: authState.branchId);
 });
 
 // ─── Metadata Providers ───────────────────────────────────────
@@ -63,14 +49,11 @@ class POSTablesNotifier extends AsyncNotifier<List<TableModel>> {
   }
 
   Future<List<TableModel>> _fetch() async {
-    final ids = await ref.watch(_tablesSessionIdsProvider.future);
+    final ids = ref.watch(_tablesSessionIdsProvider);
     final branchId = ids.branchId;
 
     if (branchId == null) {
-      if (kDebugMode) {
-        debugPrint('[posTablesProvider] No branchId — using mock tables');
-      }
-      return MockPOSData.tables;
+      throw Exception('No branchId context configured. Please verify your login session.');
     }
 
     try {
@@ -78,8 +61,7 @@ class POSTablesNotifier extends AsyncNotifier<List<TableModel>> {
       return await repo.fetchTables(branchId);
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[posTablesProvider] fetchTables failed ($e) — falling back to mock');
-        return MockPOSData.tables;
+        debugPrint('[posTablesProvider] fetchTables failed: $e');
       }
       rethrow;
     }
@@ -90,28 +72,55 @@ class POSTablesNotifier extends AsyncNotifier<List<TableModel>> {
     state = await AsyncValue.guard(() => _fetch());
   }
 
-  // No-op local mutations as tables are read-only and backend is the sole source of truth
+  // Mutate local state so the UI reflects changes (optimistic updates/mock operations)
   void updateStatus(String tableId, POSTableStatus status) {
-    if (kDebugMode) {
-      debugPrint('[posTablesProvider] updateStatus ignored (read-only mode)');
+    final currentList = state.valueOrNull;
+    if (currentList != null) {
+      state = AsyncValue.data(
+        currentList.map((t) => t.id == tableId ? t.copyWith(status: status) : t).toList(),
+      );
     }
   }
 
   void updateBill(String tableId, double amount) {
-    if (kDebugMode) {
-      debugPrint('[posTablesProvider] updateBill ignored (read-only mode)');
+    final currentList = state.valueOrNull;
+    if (currentList != null) {
+      state = AsyncValue.data(
+        currentList.map((t) => t.id == tableId ? t.copyWith(billTotal: amount) : t).toList(),
+      );
     }
   }
 
   void seatTable(String tableId, int guestCount, String waiter) {
-    if (kDebugMode) {
-      debugPrint('[posTablesProvider] seatTable ignored (read-only mode)');
+    final currentList = state.valueOrNull;
+    if (currentList != null) {
+      state = AsyncValue.data(
+        currentList.map((t) => t.id == tableId
+            ? t.copyWith(
+                status: POSTableStatus.occupied,
+                guestCount: guestCount,
+                waiterName: waiter,
+                occupiedSince: DateTime.now(),
+              )
+            : t).toList(),
+      );
     }
   }
 
   void clearTable(String tableId) {
-    if (kDebugMode) {
-      debugPrint('[posTablesProvider] clearTable ignored (read-only mode)');
+    final currentList = state.valueOrNull;
+    if (currentList != null) {
+      state = AsyncValue.data(
+        currentList.map((t) => t.id == tableId
+            ? t.copyWith(
+                status: POSTableStatus.available,
+                guestCount: 0,
+                waiterName: null,
+                occupiedSince: null,
+                billTotal: 0.0,
+              )
+            : t).toList(),
+      );
     }
   }
 }

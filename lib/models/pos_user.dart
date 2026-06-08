@@ -101,31 +101,31 @@ class PosUser {
     );
   }
 
-  /// Mock users database with associated emails
+  /// Mock users database with associated emails mapped to seeded backend owners
   static const List<PosUser> mockUsers = [
     PosUser(
-      id: 'usr-alexander',
-      name: 'Alexander',
+      id: 'usr-royaltandoor',
+      name: 'Royal Tandoor Owner',
       role: UserRole.manager,
-      pin: '1111',
-      terminalId: 'Terminal 1',
-      email: 'alexander@orderlyy.com',
+      pin: '1234',
+      terminalId: 'Main Terminal',
+      email: 'royaltandoor.owner@test.com',
     ),
     PosUser(
-      id: 'usr-sarah',
-      name: 'Sarah',
-      role: UserRole.cashier,
-      pin: '2222',
+      id: 'usr-testcafe',
+      name: 'Test Cafe Owner',
+      role: UserRole.manager,
+      pin: '1234',
       terminalId: 'Front Counter',
-      email: 'sarah@orderlyy.com',
+      email: 'testcafe.owner@test.com',
     ),
     PosUser(
-      id: 'usr-michael',
-      name: 'Michael',
-      role: UserRole.cashier,
-      pin: '3333',
+      id: 'usr-oceanbite',
+      name: 'Ocean Bite Owner',
+      role: UserRole.manager,
+      pin: '1234',
       terminalId: 'Bar Terminal',
-      email: 'michael@orderlyy.com',
+      email: 'oceanbite.owner@test.com',
     ),
     PosUser(
       id: 'usr-jessica',
