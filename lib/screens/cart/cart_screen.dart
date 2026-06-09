@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../theme/theme.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
+import '../../constants/pos_constants.dart';
 import '../../widgets/widgets.dart';
 import '../../core/extensions/extensions.dart';
 
@@ -45,6 +46,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final cartState = ref.watch(posCartProvider);
     final selectedTableId = ref.watch(cartSelectedTableProvider);
     final tables = ref.watch(posTablesProvider).valueOrNull ?? [];
+    final isCounterOrder = selectedTableId != null &&
+        PosConstants.isCounterTable(selectedTableId);
 
     // If activeTableIdProvider from Floor Plan is set, pre-fill selectedTableId
     final floorSelectedTableId = ref.watch(activeTableIdProvider);
@@ -236,6 +239,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       }).toList(),
                       onChanged: (val) {
                         ref.read(cartSelectedTableProvider.notifier).state = val;
+                        ref.read(activeTableIdProvider.notifier).state = val;
                       },
                     ),
                   if (currentSelectedTable != null && currentSelectedTable.waiterName != null) ...[
@@ -309,8 +313,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                _isSending = true;
                              });
 
-                             final selectedTable = currentSelectedTable;
-                             if (selectedTable == null) {
+                             final checkoutTableId = selectedTableId ?? currentSelectedTable?.id;
+                             if (checkoutTableId == null) {
                                setState(() {
                                  _isSending = false;
                                });
@@ -320,14 +324,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
                              final sessionIds = ref.read(cartSessionIdsProvider);
                              final tenantId = sessionIds.tenantId ?? 'tenant-mock';
-                             final branchId = sessionIds.branchId ?? 'branch-mock';
+                             final checkoutBranchId = sessionIds.branchId ?? 'branch-mock';
                              final cartId = cartState.backendCartId ?? 'cart-placeholder';
 
                              try {
                                await ref.read(ordersProvider.notifier).checkout(
                                      tenantId: tenantId,
-                                     branchId: branchId,
-                                     tableId: selectedTable.id,
+                                     branchId: checkoutBranchId,
+                                     tableId: checkoutTableId,
                                      cartId: cartId,
                                      expectedCartRevision: cartState.backendCartVersionNum,
                                      orderNotes: null, // No order-level notes field in current UI
@@ -342,8 +346,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                });
 
                                if (!mounted) return;
-                               // Success visual confirmation
-                               this.context.showSuccessSnack('Order dispatched to KDS successfully! Table ${selectedTable.number} is now active.');
+                               final destinationLabel = isCounterOrder
+                                   ? PosConstants.counterTableName
+                                   : 'Table ${currentSelectedTable?.number ?? checkoutTableId}';
+                               this.context.showSuccessSnack(
+                                 'Order dispatched to KDS successfully! $destinationLabel is now active.',
+                               );
 
                                // Route back to floorplan
                                this.context.go('/floor');

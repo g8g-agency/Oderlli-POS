@@ -281,7 +281,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// STEP 3: Employee Verification (PIN Login)
-  Future<bool> loginEmployee(String employeeId, String pin) async {
+  Future<bool> loginEmployee(PosUser staffProfile, String pin) async {
     state = state.copyWith(isLoading: true, errorMessage: () => null);
 
     try {
@@ -289,7 +289,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final employee = await repository.loginStaff(
         tenantId: state.tenantId ?? '',
         branchId: state.branchId ?? '',
-        employeeId: employeeId,
+        staffProfile: staffProfile,
         pin: pin,
       );
 
@@ -327,9 +327,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final ok = await loginOrganization(user.email ?? '', pin == '1234' ? 'Test@123456' : pin);
       if (!ok) return false;
       await selectBranch('br-royal-1', 'Royal Tandoor - Main Branch');
-      return loginEmployee('emp-owner', '1234');
+      return loginEmployee(user, '1234');
     }
-    return loginEmployee(user.id, pin);
+    return loginEmployee(user, pin);
   }
 
   /// Lock screen - preserves session info but redirects to PIN entry.
@@ -342,6 +342,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       isLocked: true,
       lockedUser: () => activeUser,
     );
+    _ref.read(authRepositoryProvider).clearStaffSession();
     _saveSessionLocally();
 
     _logToShift(
@@ -364,7 +365,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final employee = await repository.loginStaff(
         tenantId: state.tenantId ?? '',
         branchId: state.branchId ?? '',
-        employeeId: targetUser.id,
+        staffProfile: targetUser,
         pin: pin,
       );
 

@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
-import '../core/services/order_service.dart';
 import '../core/repositories/order_repository.dart';
 import '../core/repositories/cart_repository.dart';
 import 'pos_cart_provider.dart';
@@ -10,16 +9,12 @@ import 'auth_provider.dart';
 
 // ─── Infrastructure Providers ─────────────────────────────────────────────────
 
-final orderServiceProvider = Provider<OrderService>((ref) {
-  final dioClient = ref.watch(dioClientProvider);
-  return OrderService(dioClient);
-});
-
 final orderRepositoryProvider = Provider<OrderRepository>((ref) {
   final service = ref.watch(orderServiceProvider);
   final cartService = ref.watch(cartServiceProvider);
   final conn = ref.watch(connectivityServiceProvider);
-  return OrderRepository(service, cartService, conn);
+  final secureStorage = ref.watch(secureStorageProvider);
+  return OrderRepository(service, cartService, conn, secureStorage);
 });
 
 // ─── Orders Provider & Notifier ───────────────────────────────────────────────

@@ -8,6 +8,7 @@ import '../../theme/theme.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../widgets/widgets.dart';
+import '../../constants/pos_constants.dart';
 import '../../core/extensions/extensions.dart';
 
 class FloorScreen extends ConsumerStatefulWidget {
@@ -19,6 +20,21 @@ class FloorScreen extends ConsumerStatefulWidget {
 
 class _FloorScreenState extends ConsumerState<FloorScreen> {
   TableModel? _selectedTable;
+
+  void _selectTableForOrdering(String tableId) {
+    ref.read(activeTableIdProvider.notifier).state = tableId;
+    ref.read(cartSelectedTableProvider.notifier).state = tableId;
+  }
+
+  void _startCounterOrder() {
+    final branchId = ref.read(authProvider).branchId;
+    if (branchId == null) return;
+
+    final counterTableId = PosConstants.counterTableId;
+    _selectTableForOrdering(counterTableId);
+    setState(() => _selectedTable = null);
+    context.go('/menu');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +148,26 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
             ),
           ),
 
-          // ── 3. Main Dining Floor Plan Grid & Quick Actions ────────────────
+          // ── 3. Counter / Walk-in shortcut ─────────────────────────────────
+          Padding(
+            padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
+            child: SizedBox(
+              width: double.infinity,
+              height: 56.h,
+              child: ElevatedButton.icon(
+                onPressed: _startCounterOrder,
+                icon: const Icon(Icons.storefront),
+                label: const Text('COUNTER / WALK-IN'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.cash,
+                  foregroundColor: Colors.white,
+                  textStyle: AppTextStyles.labelLarge,
+                ),
+              ),
+            ),
+          ),
+
+          // ── 4. Main Dining Floor Plan Grid & Quick Actions ────────────────
           Expanded(
             child: context.isVerticalLayout
                 ? Column(
@@ -258,6 +293,15 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
         children: [
           Text('Quick Actions', style: AppTextStyles.titleLarge),
           Gap(16.h),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _startCounterOrder,
+              icon: const Icon(Icons.storefront),
+              label: const Text('COUNTER / WALK-IN'),
+            ),
+          ),
+          Gap(16.h),
           if (_selectedTable != null) ...[
             _buildSelectedTablePanel(ref),
           ] else ...[
@@ -266,7 +310,7 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
                 child: EmptyStateWidget(
                   icon: Icons.ads_click,
                   title: 'No Table Selected',
-                  description: 'Select a physical dining table from the floor grid to trigger order actions, billing checkout, or status updates.',
+                  description: 'Select a dining table from the floor grid, or use Counter / Walk-in for takeout orders.',
                 ),
               ),
             ),
@@ -312,7 +356,7 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
               onPressed: () {
                 final currentUserName = ref.read(authProvider).user?.name ?? 'Sarah';
                 ref.read(posTablesProvider.notifier).seatTable(table.id, 2, currentUserName);
-                ref.read(activeTableIdProvider.notifier).state = table.id;
+                _selectTableForOrdering(table.id);
                 setState(() => _selectedTable = null);
               },
               text: 'SEAT GUESTS',
@@ -323,7 +367,7 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
               onPressed: () {
                 final currentUserName = ref.read(authProvider).user?.name ?? 'Sarah';
                 ref.read(posTablesProvider.notifier).seatTable(table.id, 2, currentUserName);
-                ref.read(activeTableIdProvider.notifier).state = table.id;
+                _selectTableForOrdering(table.id);
                 context.go('/menu');
               },
               text: 'OPEN MENU BOOK',
@@ -333,7 +377,7 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
             PrimaryButton(
               onPressed: () {
                 // Open menu / add items for this table
-                ref.read(activeTableIdProvider.notifier).state = table.id;
+                _selectTableForOrdering(table.id);
                 context.go('/menu');
               },
               text: 'MANAGE ORDER ITEMS',
@@ -345,7 +389,7 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
                 PrimaryButton(
                   onPressed: () {
                     // Direct route to checkout payments
-                    ref.read(activeTableIdProvider.notifier).state = table.id;
+                    _selectTableForOrdering(table.id);
                     context.go('/checkout');
                   },
                   text: 'PROCEED TO CHECKOUT',

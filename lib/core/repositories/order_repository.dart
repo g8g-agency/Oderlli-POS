@@ -7,12 +7,14 @@ import '../constants/app_config.dart';
 import '../services/order_service.dart';
 import '../services/cart_service.dart';
 import '../services/connectivity_service.dart';
+import '../services/secure_storage_service.dart';
 import 'cart_repository.dart'; // Exceptions
 
 class OrderRepository {
   final OrderService _orderService;
   final CartService _cartService;
   final ConnectivityService _connectivityService;
+  final SecureStorageService _secureStorage;
   final Uuid _uuid = const Uuid();
 
   // Local cache of QR Session tokens per table
@@ -21,7 +23,12 @@ class OrderRepository {
   // Mock list of orders for fallback in debug mode only
   final List<Order> _mockOrders = [];
 
-  OrderRepository(this._orderService, this._cartService, this._connectivityService);
+  OrderRepository(
+    this._orderService,
+    this._cartService,
+    this._connectivityService,
+    this._secureStorage,
+  );
 
   Future<bool> _shouldUseMockFallback() async {
     if (!kDebugMode || !AppConfig.allowMockFallbackInDebug) {
@@ -142,6 +149,13 @@ class OrderRepository {
     }
 
     try {
+      final staffToken = await _secureStorage.getRuntimeToken();
+      if (staffToken == null || staffToken.isEmpty) {
+        throw const CartValidationException(
+          'Not authenticated. Please log in with your PIN again.',
+        );
+      }
+
       final sessionToken = await _getOrResolveSessionToken(branchId, tableId);
       final mutationId = _uuid.v4();
       final idempotencyKey = _uuid.v4();
@@ -162,7 +176,7 @@ class OrderRepository {
       );
 
       return await _orderService.checkout(
-        qrSessionToken: sessionToken,
+        staffToken: staffToken,
         mutationId: mutationId,
         idempotencyKey: idempotencyKey,
         expectedCartRevision: expectedCartRevision,

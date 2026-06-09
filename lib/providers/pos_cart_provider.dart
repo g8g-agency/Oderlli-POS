@@ -1,6 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:uuid/uuid.dart';
+import '../constants/pos_constants.dart';
 import '../core/services/cart_service.dart';
+import '../core/services/order_service.dart';
 import '../core/repositories/cart_repository.dart';
 import '../models/models.dart';
 import 'auth_provider.dart';
@@ -108,6 +112,12 @@ final cartServiceProvider = Provider<CartService>((ref) {
   final dioClient = ref.watch(dioClientProvider);
   return CartService(dioClient);
 });
+
+final orderServiceProvider = Provider<OrderService>((ref) {
+  final dioClient = ref.watch(dioClientProvider);
+  return OrderService(dioClient);
+});
+
 final cartRepositoryProvider = Provider<CartRepository>((ref) {
   final service = ref.watch(cartServiceProvider);
   final conn = ref.watch(connectivityServiceProvider);
@@ -127,6 +137,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
   final String? tenantId;
   final String? branchId;
   final String? tableId;
+  final _secureStorage = const FlutterSecureStorage();
 
   POSCartNotifier({
     required this.ref,
@@ -138,13 +149,17 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
 
   /// Load cart details from the backend/repository
   Future<void> loadCart() async {
-    if (tenantId == null || branchId == null || tableId == null) {
+    if (tenantId == null || branchId == null) {
       state = state.copyWith(isLoading: false);
       return;
     }
     state = state.copyWith(isLoading: true, errorMessage: () => null, isSchemaMismatch: false);
     try {
-      final cart = await repository.getCart(tenantId!, branchId!, tableId!);
+      final cart = await repository.getCart(
+        tenantId!,
+        branchId!,
+        tableId ?? PosConstants.counterTableId,
+      );
       _updateStateFromCart(cart);
     } on DatabaseSchemaMismatchException catch (e) {
       state = state.copyWith(
@@ -193,8 +208,8 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
 
   /// Add item to cart
   Future<void> addItem(MenuItem menuItem) async {
-    if (tenantId == null || branchId == null || tableId == null) return;
-    
+    if (tenantId == null || branchId == null) return;
+
     // Check if the item already exists with exact same modifiers (none, by default when adding from book)
     final existingIndex = state.items.indexWhere(
         (i) => i.menuItem.id == menuItem.id && i.selectedModifiers.isEmpty);
@@ -208,7 +223,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         updatedCart = await repository.updateCartItem(
           tenantId: tenantId!,
           branchId: branchId!,
-          tableId: tableId!,
+          tableId: tableId ?? PosConstants.counterTableId,
           itemId: existingItem.backendId ?? '',
           quantity: existingItem.qty + 1,
           itemNotes: existingItem.notes,
@@ -222,7 +237,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         updatedCart = await repository.addCartItem(
           tenantId: tenantId!,
           branchId: branchId!,
-          tableId: tableId!,
+          tableId: tableId ?? PosConstants.counterTableId,
           menuItem: menuItem,
           quantity: 1,
           expectedCartRevision: state.backendCartVersionNum,
@@ -245,7 +260,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
 
   /// Decrement or remove item from cart
   Future<void> removeItem(MenuItem menuItem) async {
-    if (tenantId == null || branchId == null || tableId == null) return;
+    if (tenantId == null || branchId == null) return;
 
     // Remove the last matching item by ID
     final existingIndex = state.items.lastIndexWhere((i) => i.menuItem.id == menuItem.id);
@@ -260,7 +275,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         updatedCart = await repository.updateCartItem(
           tenantId: tenantId!,
           branchId: branchId!,
-          tableId: tableId!,
+          tableId: tableId ?? PosConstants.counterTableId,
           itemId: existingItem.backendId ?? '',
           quantity: existingItem.qty - 1,
           itemNotes: existingItem.notes,
@@ -271,7 +286,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         updatedCart = await repository.removeCartItem(
           tenantId: tenantId!,
           branchId: branchId!,
-          tableId: tableId!,
+          tableId: tableId ?? PosConstants.counterTableId,
           itemId: existingItem.backendId ?? '',
           itemVersionNum: existingItem.versionNum,
           expectedCartRevision: state.backendCartVersionNum,
@@ -291,7 +306,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
 
   /// Update item notes
   Future<void> updateNotes(String menuItemId, String notes) async {
-    if (tenantId == null || branchId == null || tableId == null) return;
+    if (tenantId == null || branchId == null) return;
 
     final existingIndex = state.items.indexWhere((i) => i.menuItem.id == menuItemId);
     if (existingIndex < 0) return;
@@ -303,7 +318,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
       final updatedCart = await repository.updateCartItem(
         tenantId: tenantId!,
         branchId: branchId!,
-        tableId: tableId!,
+        tableId: tableId ?? PosConstants.counterTableId,
         itemId: existingItem.backendId ?? '',
         quantity: existingItem.qty,
         itemNotes: notes,
@@ -355,7 +370,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
       var updatedCart = await repository.removeCartItem(
         tenantId: tenantId!,
         branchId: branchId!,
-        tableId: tableId!,
+        tableId: tableId ?? PosConstants.counterTableId,
         itemId: existingItem.backendId ?? '',
         itemVersionNum: existingItem.versionNum,
         expectedCartRevision: state.backendCartVersionNum,
@@ -365,7 +380,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
       updatedCart = await repository.addCartItem(
         tenantId: tenantId!,
         branchId: branchId!,
-        tableId: tableId!,
+        tableId: tableId ?? PosConstants.counterTableId,
         menuItem: existingItem.menuItem,
         quantity: existingItem.qty,
         itemNotes: existingItem.notes,
@@ -388,6 +403,27 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
   /// Apply discount
   void applyDiscount(double percent) {
     state = state.copyWith(discountPercent: percent);
+  }
+
+  Future<Order> checkoutOrder({required OrderService orderService}) async {
+    final staffToken = await _secureStorage.read(key: 'staff_jwt_token');
+    if (staffToken == null || staffToken.isEmpty) {
+      throw Exception('Not authenticated. Please log in again.');
+    }
+    if (state.backendCartId == null) {
+      throw Exception('No active cart to check out.');
+    }
+    return orderService.checkout(
+      staffToken: staffToken,
+      mutationId: const Uuid().v4(),
+      idempotencyKey: const Uuid().v4(),
+      expectedCartRevision: state.backendCartVersionNum,
+      mutationEnvelopeBody: {
+        'cart_id': state.backendCartId,
+        'discount_percent': state.discountPercent,
+        'tax_percent': state.taxPercent,
+      },
+    );
   }
 
   /// Clear the cart completely (locally / session reset)
@@ -449,8 +485,8 @@ final posCartProvider = StateNotifierProvider<POSCartNotifier, POSCartState>((re
     tableId: selectedTableId,
   );
 
-  // Trigger loading the cart immediately when table selection is populated
-  if (selectedTableId != null) {
+  // Load cart when branch context is available (counter uses sentinel table id).
+  if (sessionIds.tenantId != null && sessionIds.branchId != null) {
     notifier.loadCart();
   }
 

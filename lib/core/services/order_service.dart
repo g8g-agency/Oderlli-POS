@@ -11,7 +11,7 @@ class OrderService {
 
   /// POST /api/v1/orders/checkout
   Future<Order> checkout({
-    required String qrSessionToken,
+    required String staffToken,
     required String mutationId,
     required String idempotencyKey,
     required int expectedCartRevision,
@@ -22,7 +22,7 @@ class OrderService {
       data: mutationEnvelopeBody,
       options: Options(
         headers: {
-          'X-QR-Session-Token': qrSessionToken,
+          'Authorization': 'Bearer $staffToken',
           'X-Mutation-Id': mutationId,
           'X-Expected-Cart-Revision': expectedCartRevision.toString(),
           'Idempotency-Key': idempotencyKey,

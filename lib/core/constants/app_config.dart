@@ -14,6 +14,7 @@ abstract final class AppConfig {
   static const String refreshTokenKey = 'refresh_token';
   static const String deviceSessionIdKey = 'device_session_id';
   static const String authUserKey = 'auth_user_json';
-  
+  static const String runtimeTokenKey = 'runtime_token';
+
   static const bool allowMockFallbackInDebug = false;
 }

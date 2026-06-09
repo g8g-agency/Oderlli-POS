@@ -86,10 +86,27 @@ class SecureStorageService {
     };
   }
 
+  Future<void> saveRuntimeToken(String runtimeToken) async {
+    await _write(AppConfig.runtimeTokenKey, runtimeToken);
+    await _write('staff_jwt_token', runtimeToken);
+  }
+
+  Future<String?> getRuntimeToken() async {
+    final token = await _read(AppConfig.runtimeTokenKey);
+    if (token != null && token.isNotEmpty) return token;
+    return _read('staff_jwt_token');
+  }
+
+  Future<void> clearRuntimeToken() async {
+    await _delete(AppConfig.runtimeTokenKey);
+    await _delete('staff_jwt_token');
+  }
+
   Future<void> clearSession() async {
     await _delete(AppConfig.accessTokenKey);
     await _delete(AppConfig.refreshTokenKey);
     await _delete(AppConfig.deviceSessionIdKey);
     await _delete(AppConfig.authUserKey);
+    await clearRuntimeToken();
   }
 }

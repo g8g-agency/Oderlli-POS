@@ -9,6 +9,7 @@ import '../../theme/theme.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../widgets/widgets.dart';
+import '../../constants/pos_constants.dart';
 import '../../core/extensions/extensions.dart';
 import '../../routes/app_routes.dart';
 
@@ -136,11 +137,24 @@ class MenuScreen extends ConsumerWidget {
     // Watch active table metadata
     final tableId = ref.watch(activeTableIdProvider);
     final tables = ref.watch(posTablesProvider).valueOrNull ?? [];
-    final activeTable = tableId != null
-        ? (tables.isEmpty
-            ? null
-            : tables.firstWhere((t) => t.id == tableId, orElse: () => tables.first))
-        : null;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (tableId != null && ref.read(cartSelectedTableProvider) != tableId) {
+        ref.read(cartSelectedTableProvider.notifier).state = tableId;
+      }
+    });
+
+    TableModel? activeTable;
+    if (tableId != null && tables.isNotEmpty) {
+      for (final table in tables) {
+        if (table.id == tableId) {
+          activeTable = table;
+          break;
+        }
+      }
+    }
+    final isCounterOrder =
+        tableId != null && PosConstants.isCounterTable(tableId);
 
     final isVertical = context.isVerticalLayout;
 
@@ -153,7 +167,7 @@ class MenuScreen extends ConsumerWidget {
           // ── Header & Search Row ────────────────────────────────────────────
           Padding(
             padding: EdgeInsets.fromLTRB(16.r, 16.r, 16.r, 0),
-            child: POSHeader(activeTable: activeTable),
+            child: POSHeader(activeTable: activeTable, isCounterOrder: isCounterOrder),
           ),
           
           Padding(
@@ -319,6 +333,7 @@ class MenuScreen extends ConsumerWidget {
             child: OrderCartPanel(
               cartState: cartState,
               activeTable: activeTable,
+              isCounterOrder: isCounterOrder,
             ),
           ),
         ],
@@ -550,13 +565,14 @@ class POSSidebar extends StatelessWidget {
 
 /// ─── Component: POSHeader ───────────────────────────────────────────────────
 class POSHeader extends StatelessWidget {
-  const POSHeader({super.key, this.activeTable});
+  const POSHeader({super.key, this.activeTable, this.isCounterOrder = false});
 
   final dynamic activeTable;
+  final bool isCounterOrder;
 
   @override
   Widget build(BuildContext context) {
-    final hasTable = activeTable != null;
+    final hasTable = activeTable != null || isCounterOrder;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -574,9 +590,11 @@ class POSHeader extends StatelessWidget {
             _buildDotSeparator(),
             _buildMetadataItem(
               Icons.table_bar_outlined,
-              hasTable ? 'Table ${activeTable.number}' : 'Quick Order',
+              isCounterOrder
+                  ? PosConstants.counterTableName
+                  : (activeTable != null ? 'Table ${activeTable.number}' : 'Quick Order'),
             ),
-            if (hasTable) ...[
+            if (hasTable && !isCounterOrder && activeTable != null) ...[
               _buildDotSeparator(),
               _buildMetadataItem(Icons.people_outline, '${activeTable.guestCount} Guests'),
             ],
@@ -902,10 +920,12 @@ class OrderCartPanel extends ConsumerStatefulWidget {
     super.key,
     required this.cartState,
     this.activeTable,
+    this.isCounterOrder = false,
   });
 
   final POSCartState cartState;
   final dynamic activeTable;
+  final bool isCounterOrder;
 
   @override
   ConsumerState<OrderCartPanel> createState() => _OrderCartPanelState();
@@ -932,9 +952,11 @@ class _OrderCartPanelState extends ConsumerState<OrderCartPanel> {
                 children: [
                   Text('Current Order', style: LightPOSTypography.titleLarge),
                   Text(
-                    widget.activeTable != null
-                        ? 'Table ${widget.activeTable.number} Checkout'
-                        : 'Quick Walk-In Checkout',
+                    widget.isCounterOrder
+                        ? '${PosConstants.counterTableName} Checkout'
+                        : (widget.activeTable != null
+                            ? 'Table ${widget.activeTable.number} Checkout'
+                            : 'Quick Walk-In Checkout'),
                     style: LightPOSTypography.bodySmall,
                   ),
                 ],

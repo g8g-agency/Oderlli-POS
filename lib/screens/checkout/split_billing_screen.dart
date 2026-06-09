@@ -9,6 +9,7 @@ import '../../widgets/widgets.dart';
 import '../../providers/providers.dart';
 import '../../core/extensions/extensions.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/utils/split_billing.dart';
 
 class SplitBillingScreen extends ConsumerStatefulWidget {
   const SplitBillingScreen({super.key});
@@ -348,11 +349,12 @@ class _SplitBillingScreenState extends ConsumerState<SplitBillingScreen> {
 
   Widget _buildSplitTabContent(ActiveBillState billState, List<dynamic> items, double unallocatedCustom) {
     if (_splitType == 0) {
-      final perGuestAmount = billState.total / _guestCount;
+      final splitAmounts = calculateSplitAmounts(billState.total, _guestCount);
       return ListView.separated(
         itemCount: _guestCount,
         separatorBuilder: (context, index) => Divider(color: AppColors.borderSubtle, height: AppSpacing.md.h),
         itemBuilder: (context, i) {
+          final perGuestAmount = splitAmounts[i];
           return Row(
             children: [
               CircleAvatar(
@@ -513,6 +515,10 @@ class _SplitBillingScreenState extends ConsumerState<SplitBillingScreen> {
   }
 
   Widget _buildSummaryList(ActiveBillState billState, List<dynamic> items, double totalCustom, double unallocatedCustom) {
+    final equalSplitAmounts = _splitType == 0
+        ? calculateSplitAmounts(billState.total, _guestCount)
+        : const <double>[];
+
     return ListView.separated(
       itemCount: _guestCount,
       separatorBuilder: (context, index) => Divider(color: AppColors.borderSubtle, height: AppSpacing.sm.h),
@@ -520,7 +526,7 @@ class _SplitBillingScreenState extends ConsumerState<SplitBillingScreen> {
         double guestTotal = 0.0;
         
         if (_splitType == 0) {
-          guestTotal = billState.total / _guestCount;
+          guestTotal = equalSplitAmounts[index];
         } else if (_splitType == 1) {
           guestTotal = _getGuestItemTotal(index, items, billState.order.taxPercent, billState.serviceChargePercent);
         } else {

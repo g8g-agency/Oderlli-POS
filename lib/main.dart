@@ -43,7 +43,7 @@ class OrderlyyApp extends ConsumerWidget {
       minTextAdapt: true,
       splitScreenMode: true,
       builder: (context, child) {
-        return InteractionListener(
+        return InactivityScope(
           child: MaterialApp.router(
             title: 'Orderlyy POS',
             debugShowCheckedModeBanner: false,

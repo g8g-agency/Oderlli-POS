@@ -11,6 +11,7 @@ import '../screens/login/branch_selection_screen.dart';
 import '../screens/login/employee_login_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/floor/floor_screen.dart';
+import '../screens/floor/table_selection_screen.dart';
 import '../screens/orders/orders_screen.dart';
 // NOTE: kitchen_screen.dart import removed — the route is disabled but the file,
 // models, enums, and providers are preserved for future backend integration.
@@ -164,6 +165,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const FloorScreen(),
           ),
           GoRoute(
+            path: AppRoutes.tableSelection,
+            name: 'table-selection',
+            builder: (context, state) => const TableSelectionScreen(),
+          ),
+          GoRoute(
             path: AppRoutes.orders,
             name: 'orders',
             builder: (context, state) => const OrdersScreen(),
@@ -190,6 +196,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.menu,
         name: 'menu',
+        builder: (context, state) => const MenuScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.posMenu,
+        name: 'pos-menu',
         builder: (context, state) => const MenuScreen(),
       ),
 

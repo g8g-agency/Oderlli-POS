@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
+import 'auth_provider.dart';
 import 'orders_provider.dart';
 import 'table_provider.dart';
 import 'shift_provider.dart';
@@ -83,6 +84,9 @@ class ActiveBillState {
     return 'Unpaid';
   }
 
+  String get lastPaymentMethod =>
+      payments.isNotEmpty ? payments.last.method : 'Cash';
+
   ActiveBillState copyWith({
     Order? order,
     double? discountPercent,
@@ -125,6 +129,38 @@ class ActiveBillNotifier extends StateNotifier<ActiveBillState?> {
     if (state != null) {
       state = state!.copyWith(discountPercent: percent);
     }
+  }
+
+  /// Logs a manager override action to the shift activity log.
+  void auditManagerOverride({
+    required double discountPercent,
+    required String approvedByPin,
+    required String cashierName,
+  }) {
+    final currentState = state;
+    if (currentState == null) return;
+
+    final orderId = currentState.order.orderNumber ?? currentState.order.id;
+    final now = DateTime.now();
+
+    final activity = ShiftActivity(
+      id: 'override-${now.millisecondsSinceEpoch}',
+      type: ShiftTransactionType.xReport,
+      timestamp: now,
+      amount: 0.0,
+      title: 'Manager Override: ${discountPercent.toStringAsFixed(0)}% Discount',
+      subtitle: 'Order $orderId — approved by manager PIN '
+          '•••• — cashier: $cashierName',
+      performedBy: 'Manager',
+    );
+
+    _ref.read(shiftProvider.notifier).state =
+        _ref.read(shiftProvider.notifier).state.copyWith(
+              activities: [
+                activity,
+                ..._ref.read(shiftProvider.notifier).state.activities,
+              ],
+            );
   }
 
   void applyServiceCharge(double percent) {
@@ -176,4 +212,27 @@ class ActiveBillNotifier extends StateNotifier<ActiveBillState?> {
 /// Provider exposing the active billing/checkout state.
 final activeBillProvider = StateNotifierProvider<ActiveBillNotifier, ActiveBillState?>((ref) {
   return ActiveBillNotifier(ref);
+});
+
+/// Branch-level receipt metadata (GSTIN/FSSAI can be wired from API later).
+class BranchConfig {
+  const BranchConfig({
+    required this.restaurantName,
+    required this.branchName,
+    this.gstin,
+    this.fssai,
+  });
+
+  final String restaurantName;
+  final String branchName;
+  final String? gstin;
+  final String? fssai;
+}
+
+final branchConfigProvider = Provider<BranchConfig>((ref) {
+  final auth = ref.watch(authProvider);
+  return BranchConfig(
+    restaurantName: auth.branchName ?? 'Orderlli Restaurant',
+    branchName: auth.branchName ?? 'Main Branch',
+  );
 });

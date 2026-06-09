@@ -20,3 +20,4 @@ export 'table_section.dart';
 export 'cart_modifier.dart';
 export 'cart_item.dart';
 export 'cart.dart';
+export 'receipt_request.dart';

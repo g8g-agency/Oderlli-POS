@@ -38,6 +38,7 @@ class PosUser {
     required this.pin,
     required this.terminalId,
     this.email,
+    this.employeeId,
     this.permissions = const [],
   });
 
@@ -47,7 +48,32 @@ class PosUser {
   final String pin;
   final String terminalId;
   final String? email;
+  final String? employeeId;
   final List<String> permissions;
+
+  String get loginEmployeeId => employeeId ?? id;
+
+  PosUser copyWith({
+    String? id,
+    String? name,
+    UserRole? role,
+    String? pin,
+    String? terminalId,
+    String? email,
+    String? employeeId,
+    List<String>? permissions,
+  }) {
+    return PosUser(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      role: role ?? this.role,
+      pin: pin ?? this.pin,
+      terminalId: terminalId ?? this.terminalId,
+      email: email ?? this.email,
+      employeeId: employeeId ?? this.employeeId,
+      permissions: permissions ?? this.permissions,
+    );
+  }
 
   String get initials {
     if (name.isEmpty) return '?';
@@ -66,6 +92,7 @@ class PosUser {
         'pin': pin,
         'terminalId': terminalId,
         'email': email,
+        'employeeId': employeeId,
         'permissions': permissions,
       };
 
@@ -76,6 +103,7 @@ class PosUser {
         pin: json['pin'] as String,
         terminalId: json['terminalId'] as String,
         email: json['email'] as String?,
+        employeeId: json['employeeId'] as String?,
         permissions: (json['permissions'] as List<dynamic>?)?.map((e) => e as String).toList() ?? const [],
       );
 
