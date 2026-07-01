@@ -13,6 +13,7 @@ class PosTable {
   final bool isActive;
   final int versionNum;
   final String? runtimeState;
+  final int? guestCount;
 
   const PosTable({
     required this.id,
@@ -29,6 +30,7 @@ class PosTable {
     required this.isActive,
     required this.versionNum,
     this.runtimeState,
+    this.guestCount,
   });
 
   factory PosTable.fromJson(Map<String, dynamic> json) => PosTable(
@@ -46,6 +48,7 @@ class PosTable {
         isActive: (json['is_active'] ?? true) as bool,
         versionNum: (json['version_num'] ?? 0) as int,
         runtimeState: json['runtime_state'] as String?,
+        guestCount: json['guest_count'] as int?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -63,5 +66,6 @@ class PosTable {
         'is_active': isActive,
         'version_num': versionNum,
         'runtime_state': runtimeState,
+        'guest_count': guestCount,
       };
 }

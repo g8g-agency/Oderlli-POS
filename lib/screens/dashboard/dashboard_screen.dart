@@ -17,12 +17,13 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final activeOrders = ref.watch(activeOrdersProvider);
     final tables = ref.watch(tablesProvider);
+    final liveTables = ref.watch(liveTableStatusProvider);
     final auth = ref.watch(authProvider);
     final user = auth.user;
     final role = user?.role ?? UserRole.server;
 
     final occupiedCount =
-        tables.where((t) => t.status == TableStatus.occupied).length;
+        liveTables.where((t) => t.status != POSTableStatus.available).length;
 
     // Filter active orders based on role mapping
     final myAssignedOrders = activeOrders.where((o) => o.servedBy == user?.name).toList();
@@ -215,7 +216,7 @@ class _TopBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final displayName = user?.name ?? 'Alexander';
+    final displayName = user?.name ?? 'Staff';
     final displayRole = user?.role ?? UserRole.manager;
     final greeting = ref.watch(greetingProvider);
     final authState = ref.watch(authProvider);
@@ -525,7 +526,7 @@ class _ManagerQuickActions extends StatelessWidget {
             children: [
               Expanded(
                 child: SecondaryButton(
-                  onPressed: () => context.go('/checkout/refund'),
+                  onPressed: () => context.push('/checkout/refund'),
                   text: 'ISSUE REFUND',
                   icon: Icons.assignment_return,
                 ),

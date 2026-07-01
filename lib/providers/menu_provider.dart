@@ -37,6 +37,7 @@ final categoriesProvider = AsyncNotifierProvider<_CategoriesNotifier, List<Categ
 class _CategoriesNotifier extends AsyncNotifier<List<Category>> {
   @override
   Future<List<Category>> build() async {
+    if (ref.read(authProvider).user == null) return const [];
     final ids = ref.watch(_sessionIdsProvider);
     final tenantId = ids.tenantId;
 
@@ -67,6 +68,7 @@ final menuItemsProvider = AsyncNotifierProvider<_MenuItemsNotifier, List<MenuIte
 class _MenuItemsNotifier extends AsyncNotifier<List<MenuItem>> {
   @override
   Future<List<MenuItem>> build() async {
+    if (ref.read(authProvider).user == null) return const [];
     final ids = ref.watch(_sessionIdsProvider);
     final tenantId = ids.tenantId;
     final branchId = ids.branchId;

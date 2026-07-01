@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -260,59 +261,62 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                         ),
                       ),
-                      Gap(28.h),
 
-                      // Demo / Seed Accounts Helper Widget
-                      Container(
-                        padding: EdgeInsets.all(16.r),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E2122) : const Color(0xFFF1F3F4),
-                          borderRadius: BorderRadius.circular(16.r),
-                          border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE1E3E4)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              '💡 DEMO ACCOUNTS (SEED DATA)',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.bold,
-                                color: brandRed,
-                                letterSpacing: 0.5,
+                      
+                      // Demo shortcuts — hidden in release builds
+                      if (kDebugMode) ...[
+                        Gap(28.h),
+                        Container(
+                          padding: EdgeInsets.all(16.r),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E2122) : const Color(0xFFF1F3F4),
+                            borderRadius: BorderRadius.circular(16.r),
+                            border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE1E3E4)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                '💡 DEMO ACCOUNTS (SEED DATA)',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color: brandRed,
+                                  letterSpacing: 0.5,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                              textAlign: TextAlign.center,
-                            ),
-                            Gap(12.h),
-                            _buildDemoAccountButton(
-                              'Royal Tandoor (Owner)',
-                              'royaltandoor.owner@test.com',
-                              isDark,
-                            ),
-                            Gap(8.h),
-                            _buildDemoAccountButton(
-                              'Test Cafe (Owner)',
-                              'testcafe.owner@test.com',
-                              isDark,
-                            ),
-                            Gap(8.h),
-                            _buildDemoAccountButton(
-                              'Ocean Bite (Owner)',
-                              'oceanbite.owner@test.com',
-                              isDark,
-                            ),
-                            Gap(10.h),
-                            Text(
-                              'Password: Test@123456',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11.sp,
-                                color: isDark ? Colors.white54 : Colors.black54,
+                              Gap(12.h),
+                              _buildDemoAccountButton(
+                                'Royal Tandoor (Owner)',
+                                'royaltandoor.owner@test.com',
+                                isDark,
                               ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                              Gap(8.h),
+                              _buildDemoAccountButton(
+                                'Test Cafe (Owner)',
+                                'testcafe.owner@test.com',
+                                isDark,
+                              ),
+                              Gap(8.h),
+                              _buildDemoAccountButton(
+                                'Ocean Bite (Owner)',
+                                'oceanbite.owner@test.com',
+                                isDark,
+                              ),
+                              Gap(10.h),
+                              Text(
+                                'Password: Test@123456',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11.sp,
+                                  color: isDark ? Colors.white54 : Colors.black54,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),

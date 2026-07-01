@@ -79,12 +79,16 @@ class BranchInfo {
   final String name;
   final String timezone;
   final String? tenantId;
+  final String? gstin;
+  final String? fssai;
 
   const BranchInfo({
     required this.id,
     required this.name,
     required this.timezone,
     this.tenantId,
+    this.gstin,
+    this.fssai,
   });
 
   Map<String, dynamic> toJson() => {
@@ -92,6 +96,8 @@ class BranchInfo {
         'name': name,
         'timezone': timezone,
         if (tenantId != null) 'tenantId': tenantId,
+        'gstin': gstin,
+        'fssai_license_number': fssai,
       };
 
   factory BranchInfo.fromJson(Map<String, dynamic> json) => BranchInfo(
@@ -99,5 +105,7 @@ class BranchInfo {
         name: json['name'] as String,
         timezone: (json['timezone'] ?? 'UTC') as String,
         tenantId: (json['tenantId'] ?? json['tenant_id']) as String?,
+        gstin: json['gstin'] as String?,
+        fssai: (json['fssai_license_number'] ?? json['fssai']) as String?,
       );
 }

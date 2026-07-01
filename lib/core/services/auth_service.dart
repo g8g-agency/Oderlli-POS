@@ -66,27 +66,52 @@ class AuthService {
     if (response.statusCode == 200) {
       final body = response.data;
       if (body != null && body['success'] == true) {
-        final staffJson = (body['data']['staff'] as List<dynamic>?) ?? [];
-        return staffJson.map((s) {
+        final dynamic dataField = body['data'];
+        final List<dynamic> staffJson;
+        if (dataField is Map && dataField.containsKey('staff')) {
+          staffJson = (dataField['staff'] as List<dynamic>?) ?? [];
+        } else if (dataField is List) {
+          staffJson = dataField;
+        } else {
+          staffJson = [];
+        }
+        return staffJson.map((raw) {
+          final s = raw as Map<String, dynamic>;
           final roleStr = (s['role'] as String? ?? '').toLowerCase();
           final UserRole mappedRole;
-          if (roleStr == 'manager' || roleStr == 'owner' || roleStr == 'superadmin') {
+          if (roleStr == 'manager' ||
+              roleStr == 'owner' ||
+              roleStr == 'superadmin' ||
+              roleStr == 'restaurant_admin') {
             mappedRole = UserRole.manager;
           } else if (roleStr == 'cashier') {
             mappedRole = UserRole.cashier;
           } else {
-            // waiter, kitchen, server → floor service
             mappedRole = UserRole.server;
           }
-          // Backend column is 'name'; PIN login response aliases as 'full_name'
-          final displayName = (s['name'] ?? s['full_name'] ?? 'Unknown').toString();
+
+          final firstName = s['first_name'] as String? ?? '';
+          final lastName = s['last_name'] as String? ?? '';
+          final combinedName = '$firstName $lastName'.trim();
+          final displayName = (s['name'] ??
+                  s['full_name'] ??
+                  (combinedName.isNotEmpty ? combinedName : null) ??
+                  'Unknown')
+              .toString();
+
+          final id = s['id']?.toString();
+          if (id == null || id.isEmpty) {
+            throw StateError('Staff record missing id');
+          }
+
           return PosUser(
-            id: s['id'] as String,
+            id: id,
             name: displayName,
             role: mappedRole,
             pin: '',
             terminalId: 'Main Terminal',
-            email: s['email'] as String?,
+            email: s['email']?.toString(),
+            employeeId: s['employee_id']?.toString(),
           );
         }).toList();
       }
@@ -98,14 +123,15 @@ class AuthService {
     );
   }
 
-  Future<PosUser> loginStaff({
+  Future<({String runtimeToken, PosUser user})> loginStaff({
     required String tenantId,
     required String branchId,
     required String employeeId,
     required String pin,
+    required PosUser staffProfile,
   }) async {
     final response = await _dioClient.dio.post(
-      '/auth/staff/pin-login',
+      '/auth/staff/login',
       data: {
         'tenantId': tenantId,
         'branchId': branchId,
@@ -116,17 +142,18 @@ class AuthService {
     if (response.statusCode == 200) {
       final body = response.data;
       if (body != null && body['success'] == true) {
-        final staff = body['data']['staff'];
-        final mappedRole = staff['role']?.toString().toUpperCase() == 'CASHIER' 
-            ? UserRole.cashier 
-            : (staff['role']?.toString().toUpperCase() == 'MANAGER' ? UserRole.manager : UserRole.server);
-        return PosUser(
-          id: staff['id'] as String,
-          name: staff['full_name'] as String,
-          role: mappedRole,
-          pin: pin,
-          terminalId: 'Main Terminal',
-          email: staff['email'] as String?,
+        final data = body['data'] as Map<String, dynamic>;
+        final runtimeToken = data['runtime_token'] as String?;
+        if (runtimeToken == null || runtimeToken.isEmpty) {
+          throw DioException(
+            requestOptions: response.requestOptions,
+            response: response,
+            message: 'Staff login succeeded but no runtime token was returned',
+          );
+        }
+        return (
+          runtimeToken: runtimeToken,
+          user: staffProfile.copyWith(pin: pin),
         );
       }
     }

@@ -1,25 +1,22 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../constants/pos_constants.dart';
 import '../models/models.dart';
-import '../core/services/order_service.dart';
 import '../core/repositories/order_repository.dart';
 import '../core/repositories/cart_repository.dart';
 import 'pos_cart_provider.dart';
 import 'table_provider.dart';
 import 'auth_provider.dart';
 
-// ─── Infrastructure Providers ─────────────────────────────────────────────────
 
-final orderServiceProvider = Provider<OrderService>((ref) {
-  final dioClient = ref.watch(dioClientProvider);
-  return OrderService(dioClient);
-});
+// ─── Infrastructure Providers ─────────────────────────────────────────────────
 
 final orderRepositoryProvider = Provider<OrderRepository>((ref) {
   final service = ref.watch(orderServiceProvider);
   final cartService = ref.watch(cartServiceProvider);
   final conn = ref.watch(connectivityServiceProvider);
-  return OrderRepository(service, cartService, conn);
+  final secureStorage = ref.watch(secureStorageProvider);
+  return OrderRepository(service, cartService, conn, secureStorage);
 });
 
 // ─── Orders Provider & Notifier ───────────────────────────────────────────────
@@ -42,6 +39,7 @@ class OrdersNotifier extends StateNotifier<List<Order>> {
   }
 
   Future<void> fetchOrders() async {
+    if (ref.read(authProvider).user == null) return;
     final sessionIds = ref.read(cartSessionIdsProvider);
     final branchId = sessionIds.branchId;
     if (branchId == null) {
@@ -86,7 +84,6 @@ class OrdersNotifier extends StateNotifier<List<Order>> {
     }
   }
 
-  /// Perform Checkout action
   Future<Order> checkout({
     required String tenantId,
     required String branchId,
@@ -95,6 +92,9 @@ class OrdersNotifier extends StateNotifier<List<Order>> {
     required int expectedCartRevision,
     String? orderNotes,
   }) async {
+    debugPrint('[DEBUG] orders_provider checkout: tableId=$tableId, cartId=$cartId');
+    debugPrint('[DEBUG] PosConstants.counterTableId=${PosConstants.counterTableId}, isCounterTable=${PosConstants.isCounterTable(tableId)}');
+
     // 1. Pre-condition Validation
     final cartState = ref.read(posCartProvider);
     if (cartState.items.isEmpty) {
@@ -102,18 +102,44 @@ class OrdersNotifier extends StateNotifier<List<Order>> {
     }
 
     final selectedTableId = ref.read(cartSelectedTableProvider);
+    debugPrint('[DEBUG] selectedTableId=$selectedTableId');
     if (selectedTableId == null || selectedTableId != tableId) {
       throw const CartValidationException('Pre-checkout Validation Failed: Selected table mismatch.');
     }
 
     try {
+      String finalCartId = cartId;
+      int finalCartRevision = expectedCartRevision;
+
+      if (tableId == PosConstants.counterTableId || PosConstants.isCounterTable(tableId)) {
+        debugPrint('[DEBUG] Detected counter table checkout! Syncing cart to backend...');
+        final itemsToSync = cartState.items.map((item) => {
+          'menuItem': item.menuItem,
+          'quantity': item.qty,
+          'notes': item.notes,
+          'selectedModifiers': item.selectedModifiers,
+        }).toList();
+
+        final backendCart = await ref.read(cartRepositoryProvider).syncCartToBackend(
+          tenantId: tenantId,
+          branchId: branchId,
+          tableId: tableId,
+          items: itemsToSync,
+        );
+
+        finalCartId = backendCart.id;
+        finalCartRevision = backendCart.versionNum;
+        debugPrint('[DEBUG] Sync completed. finalCartId=$finalCartId, versionNum=$finalCartRevision');
+      }
+
+      debugPrint('[DEBUG] Proceeding to repository checkout with finalCartId=$finalCartId');
       // 2. Perform checkout REST API request via repository
       final newOrder = await repository.checkout(
         tenantId: tenantId,
         branchId: branchId,
         tableId: tableId,
-        cartId: cartId,
-        expectedCartRevision: expectedCartRevision,
+        cartId: finalCartId,
+        expectedCartRevision: finalCartRevision,
         orderNotes: orderNotes,
       );
 

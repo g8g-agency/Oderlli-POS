@@ -25,6 +25,7 @@ class POSTableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     // Map POSTableStatus to OperationalStatus
     final opStatus = _mapToOperationalStatus(table.status);
     final statusColor = opStatus.color;
@@ -64,9 +65,23 @@ class POSTableCard extends StatelessWidget {
                   // Header: Table Number & Capacity
                   Row(
                     children: [
-                      Text(
-                        'TABLE ${table.number}',
-                        style: AppTypography.tableLabel,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'TABLE ${table.number}',
+                            style: AppTypography.tableLabel,
+                          ),
+                          if (table.assignedWaiterName != null) ...[
+                            Gap(2.h),
+                            Text(
+                              table.assignedWaiterName!,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const Spacer(),
                       Icon(

@@ -24,7 +24,7 @@ class ShiftNotifier extends StateNotifier<ShiftSession> {
           state = state.copyWith(
             cashierName: newName,
             activities: state.activities.map((act) {
-              if (act.performedBy == 'Staff' || act.performedBy == 'Alexander') {
+              if (act.performedBy == 'Staff') {
                 return ShiftActivity(
                   id: act.id,
                   type: act.type,
@@ -84,22 +84,21 @@ class ShiftNotifier extends StateNotifier<ShiftSession> {
         final decoded = jsonDecode(dataStr) as Map<String, dynamic>;
         final loadedSession = ShiftSession.fromJson(decoded);
 
-        // Discard any session that contains mock activities or is owned by Alexander
+        // Discard any session that contains mock activities
         final containsMock = loadedSession.activities.any((a) =>
             a.title.contains('Fresh veg') ||
-            a.subtitle.contains('Fresh veg') ||
-            a.performedBy == 'Alexander');
+            a.subtitle.contains('Fresh veg'));
 
         if (containsMock) {
           state = _initialSession(currentUserName);
           await _saveSession();
         } else {
-          // If cashierName is 'Staff' or 'Alexander', update it to the logged in user if available
-          if ((loadedSession.cashierName == 'Staff' || loadedSession.cashierName == 'Alexander') && currentUserName != null) {
+          // If cashierName is a placeholder, update it to the logged in user if available
+          if (loadedSession.cashierName == 'Staff' && currentUserName != null) {
             state = loadedSession.copyWith(
               cashierName: currentUserName,
               activities: loadedSession.activities.map((act) {
-                if (act.performedBy == 'Staff' || act.performedBy == 'Alexander') {
+                if (act.performedBy == 'Staff') {
                   return ShiftActivity(
                     id: act.id,
                     type: act.type,

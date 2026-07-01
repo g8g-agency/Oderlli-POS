@@ -10,7 +10,7 @@ class MenuService {
   /// GET /api/tenants/:tenantId/menu/categories/tree
   Future<List<MenuCategory>> fetchCategoryTree(String tenantId) async {
     final response = await _dioClient.dio.get(
-      '/api/tenants/$tenantId/menu/categories/tree',
+      '/tenants/$tenantId/menu/categories/tree',
     );
     _assertSuccess(response);
     final data = response.data['data'] as List<dynamic>;
@@ -28,7 +28,7 @@ class MenuService {
     String? search,
   }) async {
     final response = await _dioClient.dio.get(
-      '/api/tenants/$tenantId/menu/branch/$branchId',
+      '/tenants/$tenantId/menu/branch/$branchId',
       queryParameters: <String, dynamic>{
         // ignore: use_null_aware_elements
         if (categoryId != null) 'category_id': categoryId,

@@ -1,5 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/models.dart';
+import '../../providers/auth_provider.dart';
 import '../services/table_service.dart';
 
 class TableRepository {
@@ -9,7 +12,27 @@ class TableRepository {
   List<TableFloor>? _cachedFloors;
   List<TableSection>? _cachedSections;
 
+  // Static tracking to survive repository re-creation during auth state changes
+  static int _consecutive401Errors = 0;
+  static bool _circuitBroken = false;
+  static DateTime? _lastFailureTime;
+  static bool _lastFetchFailedWith401 = false;
+
   TableRepository(this._tableService);
+
+  bool get lastFetchFailedWith401 => _lastFetchFailedWith401;
+
+  static void resetCircuitBreaker({bool force = false, Ref? ref}) {
+    if (!force && ref != null) {
+      final user = ref.read(authProvider).user;
+      if (user == null) return; // don't reset if not truly authenticated
+    }
+    _consecutive401Errors = 0;
+    _circuitBroken = false;
+    _lastFailureTime = null;
+    _lastFetchFailedWith401 = false;
+    debugPrint('[TableRepository] Circuit breaker reset (force=$force)');
+  }
 
   /// Fetches floors, utilizing session cache if available.
   Future<List<TableFloor>> fetchFloors() async {
@@ -29,15 +52,37 @@ class TableRepository {
   }
 
   /// Fetches sections, utilizing session cache if available.
-  Future<List<TableSection>> fetchSections() async {
+  Future<List<TableSection>> fetchSections({String? branchId}) async {
+    if (_circuitBroken) {
+      throw Exception('Circuit breaker active for sections fetch due to consecutive 401 errors. Please re-authenticate or manually refresh.');
+    }
+
+    final now = DateTime.now();
+    if (_lastFailureTime != null &&
+        now.difference(_lastFailureTime!) < const Duration(seconds: 30)) {
+      throw Exception('Retry blocked: Less than 30 seconds since last failed attempt.');
+    }
+
     if (_cachedSections != null) {
       return _cachedSections!;
     }
     try {
-      final sections = await _tableService.fetchSections();
+      final sections = await _tableService.fetchSections(branchId: branchId);
+      _consecutive401Errors = 0;
+      _lastFetchFailedWith401 = false;
+      _lastFailureTime = null;
       _cachedSections = sections;
       return sections;
     } catch (e) {
+      _lastFailureTime = DateTime.now();
+      if (e is DioException && e.response?.statusCode == 401) {
+        _lastFetchFailedWith401 = true;
+        _consecutive401Errors++;
+        if (_consecutive401Errors >= 3) {
+          _circuitBroken = true;
+          debugPrint('[TableRepository] Circuit breaker activated for sections fetch after 3 consecutive 401s.');
+        }
+      }
       if (kDebugMode) {
         debugPrint('[TableRepository] fetchSections failed: $e');
       }
@@ -52,7 +97,7 @@ class TableRepository {
       // Fetch floors and sections in parallel (using cache when available)
       final results = await Future.wait([
         fetchFloors(),
-        fetchSections(),
+        fetchSections(branchId: branchId),
         _tableService.fetchTables(branchId),
       ]);
 
@@ -68,6 +113,7 @@ class TableRepository {
         final t = apiTables[i];
         final sectionName = t.sectionId != null ? sectionMap[t.sectionId] : null;
         final floorName = t.floorId != null ? floorMap[t.floorId] : null;
+        final json = t.toJson();
 
         mappedTables.add(
           TableModel(
@@ -75,8 +121,9 @@ class TableRepository {
             number: _parseTableNumber(t.tableNumber, i),
             capacity: t.capacity,
             status: _mapRuntimeState(t.runtimeState),
-            guestCount: 0, // In backend runtime_state is derived; guestCount is read-only projection
-            waiterName: null, // assignedWaiterId can be mapped to staff or left null if not needed
+            guestCount: (json['guest_count'] as num?)?.toInt() ?? 0,
+            waiterName: null,
+            assignedWaiterId: t.assignedWaiterId,
             occupiedSince: null, // Read-only from API, initialized to null if not exposed
             billTotal: 0.0,
             sectionName: sectionName,
@@ -117,5 +164,16 @@ class TableRepository {
     }
 
     return index + 1;
+  }
+
+  Future<void> vacateTable(String tableId) async {
+    try {
+      await _tableService.vacateTable(tableId);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[TableRepository] vacateTable failed: $e');
+      }
+      rethrow;
+    }
   }
 }

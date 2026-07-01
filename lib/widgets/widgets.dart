@@ -15,5 +15,6 @@ export 'pos_alert_overlay.dart';
 export 'pos_confirmation_dialog.dart';
 export 'manager_override_dialog.dart';
 export 'interaction_listener.dart';
+export 'inactivity_scope.dart';
 export 'session_expired_dialog.dart';
 

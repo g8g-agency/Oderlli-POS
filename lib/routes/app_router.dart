@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import '../models/models.dart';
 import '../core/utils/role_permissions.dart';
+import '../theme/theme.dart';
 
 import '../screens/splash/splash_screen.dart';
 import '../screens/login/login_screen.dart';
@@ -11,9 +12,9 @@ import '../screens/login/branch_selection_screen.dart';
 import '../screens/login/employee_login_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/floor/floor_screen.dart';
+import '../screens/floor/table_selection_screen.dart';
 import '../screens/orders/orders_screen.dart';
-// NOTE: kitchen_screen.dart import removed — the route is disabled but the file,
-// models, enums, and providers are preserved for future backend integration.
+// import '../screens/kitchen/kitchen_screen.dart';
 import '../screens/shifts/shifts_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/menu/menu_screen.dart';
@@ -118,6 +119,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
+      // 5. Kitchen Screen: Manager and Server Only (Cashiers Blocked)
+      if (path.startsWith(AppRoutes.kitchen)) {
+        if (role != UserRole.manager && role != UserRole.server) {
+          return AppRoutes.dashboard;
+        }
+      }
+
       return null;
     },
     routes: [
@@ -164,10 +172,21 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const FloorScreen(),
           ),
           GoRoute(
+            path: AppRoutes.tableSelection,
+            name: 'table-selection',
+            builder: (context, state) => const TableSelectionScreen(),
+          ),
+          GoRoute(
             path: AppRoutes.orders,
             name: 'orders',
             builder: (context, state) => const OrdersScreen(),
           ),
+          // Kitchen route — hidden from POS nav, re-enable when KDS integration is ready
+          // GoRoute(
+          //   path: AppRoutes.kitchen,
+          //   name: 'kitchen',
+          //   builder: (context, state) => const KitchenScreen(),
+          // ),
           GoRoute(
             path: AppRoutes.shifts,
             name: 'shifts',
@@ -190,6 +209,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.menu,
         name: 'menu',
+        builder: (context, state) => const MenuScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.posMenu,
+        name: 'pos-menu',
         builder: (context, state) => const MenuScreen(),
       ),
 
@@ -221,15 +245,27 @@ final routerProvider = Provider<GoRouter>((ref) {
               child: const SplitBillingScreen(),
             ),
           ),
-          GoRoute(
-            path: AppRoutes.refunds,
-            name: 'refunds',
-            pageBuilder: (context, state) => _buildHorizontalSlideTransitionPage(
-              key: state.pageKey,
-              child: const RefundsScreen(),
-            ),
-          ),
         ],
+      ),
+      GoRoute(
+        path: AppRoutes.refunds,
+        name: 'refunds',
+        pageBuilder: (context, state) => _buildHorizontalSlideTransitionPage(
+          key: state.pageKey,
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              backgroundColor: AppColors.surface,
+              foregroundColor: AppColors.textPrimary,
+              title: const Text('Refund Transaction'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.pop(),
+              ),
+            ),
+            body: const RefundsScreen(),
+          ),
+        ),
       ),
     ],
 

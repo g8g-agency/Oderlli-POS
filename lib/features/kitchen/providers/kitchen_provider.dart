@@ -94,8 +94,9 @@ class KitchenState {
 
 class KitchenNotifier extends StateNotifier<KitchenState> {
   final KitchenRepository _repository;
+  final String branchId;
 
-  KitchenNotifier(this._repository) : super(const KitchenState()) {
+  KitchenNotifier(this._repository, {required this.branchId}) : super(const KitchenState()) {
     loadTickets();
   }
 
@@ -111,8 +112,10 @@ class KitchenNotifier extends StateNotifier<KitchenState> {
   }
 
   Future<void> _fetchTickets({bool silent = false}) async {
+    if (branchId.isEmpty) return;
     try {
       final tickets = await _repository.getTickets(
+        branchId: branchId,
         status: state.statusFilter != null
             ? serializeKitchenTicketStatus(state.statusFilter!)
             : null,
@@ -212,7 +215,8 @@ class KitchenNotifier extends StateNotifier<KitchenState> {
 final kitchenProvider =
     StateNotifierProvider<KitchenNotifier, KitchenState>((ref) {
   final repo = ref.watch(kitchenRepositoryProvider);
-  return KitchenNotifier(repo);
+  final branchId = ref.watch(authProvider.select((s) => s.branchId)) ?? '';
+  return KitchenNotifier(repo, branchId: branchId);
 });
 
 // ─── Derived providers ────────────────────────────────────────────────────────

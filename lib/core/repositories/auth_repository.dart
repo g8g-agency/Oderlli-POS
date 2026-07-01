@@ -94,14 +94,22 @@ class AuthRepository {
   Future<PosUser> loginStaff({
     required String tenantId,
     required String branchId,
-    required String employeeId,
+    required PosUser staffProfile,
     required String pin,
   }) async {
-    return _authService.loginStaff(
+    final result = await _authService.loginStaff(
       tenantId: tenantId,
       branchId: branchId,
-      employeeId: employeeId,
+      employeeId: staffProfile.loginEmployeeId,
       pin: pin,
+      staffProfile: staffProfile,
     );
+
+    await _secureStorage.saveRuntimeToken(result.runtimeToken);
+    return result.user;
+  }
+
+  Future<void> clearStaffSession() async {
+    await _secureStorage.clearRuntimeToken();
   }
 }

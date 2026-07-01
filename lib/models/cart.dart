@@ -35,6 +35,19 @@ class Cart {
     this.items = const [],
   });
 
+  factory Cart.empty() => Cart(
+        id: '',
+        tenantId: '',
+        branchId: '',
+        tableId: '',
+        sessionId: '',
+        status: 'open',
+        versionNum: 1,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        items: const [],
+      );
+
   double get subtotal => items.fold(0.0, (sum, item) => sum + item.totalPrice);
   int get totalQty => items.fold(0, (sum, item) => sum + item.quantity);
 

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/theme.dart';
 import '../../widgets/widgets.dart';
 import '../../providers/providers.dart';
+import '../../models/models.dart';
+import '../../core/services/print_service.dart';
 import '../../core/extensions/extensions.dart';
 
 class BillingScreen extends ConsumerWidget {
@@ -16,7 +19,7 @@ class BillingScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final billState = ref.watch(activeBillProvider);
 
-    if (billState == null) {
+    if (billState == null || !billState.paymentsHydrated) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );
@@ -142,7 +145,7 @@ class BillingScreen extends ConsumerWidget {
                     children: [
                       _buildServiceChargeSection(ref, billState),
                       Gap(AppSpacing.lg.h),
-                      _buildDiscountSection(ref, billState),
+                      _buildDiscountSection(ref, billState, context),
                     ],
                   )
                 : Row(
@@ -152,7 +155,7 @@ class BillingScreen extends ConsumerWidget {
                       ),
                       Gap(AppSpacing.lg.w),
                       Expanded(
-                        child: _buildDiscountSection(ref, billState),
+                        child: _buildDiscountSection(ref, billState, context),
                       ),
                     ],
                   ),
@@ -197,10 +200,45 @@ class BillingScreen extends ConsumerWidget {
               Expanded(
                 child: PrimaryButton(
                   onPressed: billState.isPaid
-                      ? () {
-                          ref.read(activeTableIdProvider.notifier).state = null;
-                          context.showSuccessSnack('Session settled! Printing receipt...');
-                          context.go('/floor');
+                      ? () async {
+                          const storage = FlutterSecureStorage();
+                          final cashierName = await storage.read(key: 'staff_name') ??
+                              ref.read(authProvider).user?.name ??
+                              'Cashier';
+
+                          final branchConfig = ref.read(branchConfigProvider);
+                          final receiptOrder = billState.order.copyWith(
+                            discountPercent: billState.discountPercent,
+                          );
+
+                          final request = ReceiptRequest(
+                            order: receiptOrder,
+                            restaurantName: branchConfig.restaurantName,
+                            branchName: branchConfig.branchName,
+                            cashierName: cashierName,
+                            paymentMethod: billState.lastPaymentMethod,
+                            amountPaid: billState.amountPaid,
+                            gstin: branchConfig.gstin,
+                            fssai: branchConfig.fssai,
+                          );
+
+                          try {
+                            await ref.read(printServiceProvider).printReceipt(request);
+                            ref.read(activeTableIdProvider.notifier).state = null;
+                            if (!context.mounted) return;
+                            context.showSuccessSnack('Session settled! Receipt printed.');
+                            context.go('/floor');
+                          } on PrinterException catch (e) {
+                            ref.read(activeTableIdProvider.notifier).state = null;
+                            if (!context.mounted) return;
+                            context.showErrorSnack('Session settled! Print failed: ${e.message}');
+                            context.go('/floor');
+                          } catch (e) {
+                            ref.read(activeTableIdProvider.notifier).state = null;
+                            if (!context.mounted) return;
+                            context.showErrorSnack('Session settled! Printing failed: $e');
+                            context.go('/floor');
+                          }
                         }
                       : () => context.go('/checkout/payment'),
                   text: billState.isPaid ? 'COMPLETE SESSION' : 'PROCEED TO PAY',
@@ -216,7 +254,7 @@ class BillingScreen extends ConsumerWidget {
   }
 
 
-  Widget _buildServiceChargeSection(WidgetRef ref, dynamic billState) {
+  Widget _buildServiceChargeSection(WidgetRef ref, ActiveBillState billState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -253,7 +291,57 @@ class BillingScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDiscountSection(WidgetRef ref, dynamic billState) {
+  Future<void> _handleDiscountTap(
+    WidgetRef ref,
+    ActiveBillState billState,
+    double percent,
+    BuildContext context,
+  ) async {
+    // Discounts <= 20% apply immediately — no approval needed
+    if (percent <= 20.0) {
+      ref.read(activeBillProvider.notifier).applyDiscount(percent);
+      return;
+    }
+
+    // Discounts > 20% require manager PIN
+    final approved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ManagerOverrideDialog(
+        actionName: '${percent.toStringAsFixed(0)}% Discount on '
+            'Order ${billState.order.orderNumber ?? billState.order.id}',
+      ),
+    );
+
+    if (approved != true) return;
+
+    ref.read(activeBillProvider.notifier).applyDiscount(percent);
+
+    final authState = ref.read(authProvider);
+    ref.read(activeBillProvider.notifier).auditManagerOverride(
+          discountPercent: percent,
+          approvedByPin: '****',
+          cashierName: authState.user?.name ?? 'Unknown',
+        );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Manager approved ${percent.toStringAsFixed(0)}% discount.',
+          ),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Widget _buildDiscountSection(
+    WidgetRef ref,
+    ActiveBillState billState,
+    BuildContext context,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -266,7 +354,7 @@ class BillingScreen extends ConsumerWidget {
               '0%',
               0,
               billState.discountPercent,
-              (val) => ref.read(activeBillProvider.notifier).applyDiscount(val),
+              (val) => _handleDiscountTap(ref, billState, val, context),
             ),
             Gap(AppSpacing.xs.w),
             _buildPresetChip(
@@ -274,7 +362,7 @@ class BillingScreen extends ConsumerWidget {
               '10%',
               10,
               billState.discountPercent,
-              (val) => ref.read(activeBillProvider.notifier).applyDiscount(val),
+              (val) => _handleDiscountTap(ref, billState, val, context),
             ),
             Gap(AppSpacing.xs.w),
             _buildPresetChip(
@@ -282,7 +370,7 @@ class BillingScreen extends ConsumerWidget {
               '20%',
               20,
               billState.discountPercent,
-              (val) => ref.read(activeBillProvider.notifier).applyDiscount(val),
+              (val) => _handleDiscountTap(ref, billState, val, context),
             ),
           ],
         ),
@@ -290,7 +378,7 @@ class BillingScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPaymentHistoryLogCard(dynamic billState) {
+  Widget _buildPaymentHistoryLogCard(ActiveBillState billState) {
     return POSCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,7 +433,7 @@ class BillingScreen extends ConsumerWidget {
                           ),
                           const Spacer(),
                           Text(
-                            (p.amount as double).asCurrency,
+                            p.amount.asCurrency,
                             style: AppTypography.titleMedium.copyWith(
                               color: AppColors.success,
                               fontWeight: FontWeight.w700,

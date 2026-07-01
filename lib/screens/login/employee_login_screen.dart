@@ -13,15 +13,23 @@ import '../../core/extensions/extensions.dart';
 import '../../models/models.dart';
 import '../../providers/auth_provider.dart';
 
+/// Loads branch-scoped staff. Only re-fetches when tenant/branch changes —
+/// not on every auth tick (isLoading, lock state, etc.).
 final staffListProvider = FutureProvider<List<PosUser>>((ref) async {
-  final authState = ref.watch(authProvider);
-  if (authState.tenantId == null || authState.branchId == null) {
+  final tenantId = ref.watch(authProvider.select((s) => s.tenantId));
+  final branchId = ref.watch(authProvider.select((s) => s.branchId));
+
+  if (tenantId == null ||
+      tenantId.isEmpty ||
+      branchId == null ||
+      branchId.isEmpty) {
     return [];
   }
-  final repo = ref.watch(authRepositoryProvider);
+
+  final repo = ref.read(authRepositoryProvider);
   return repo.fetchStaff(
-    tenantId: authState.tenantId!,
-    branchId: authState.branchId!,
+    tenantId: tenantId,
+    branchId: branchId,
   );
 });
 
@@ -191,7 +199,7 @@ class _EmployeeLoginScreenState extends ConsumerState<EmployeeLoginScreen>
           }
         }
       } else {
-        success = await ref.read(authProvider.notifier).loginEmployee(user.id, _pin);
+        success = await ref.read(authProvider.notifier).loginEmployee(user, _pin);
       }
 
       if (success) {
@@ -831,6 +839,15 @@ class _EmployeeLoginScreenState extends ConsumerState<EmployeeLoginScreen>
     final auth = ref.watch(authProvider);
     final staffAsync = ref.watch(staffListProvider);
 
+    ref.listen<PosUser?>(
+      authProvider.select((s) => s.isLocked ? s.lockedUser : null),
+      (previous, lockedUser) {
+        if (lockedUser != null && _selectedUser?.id != lockedUser.id) {
+          setState(() => _selectedUser = lockedUser);
+        }
+      },
+    );
+
     return Focus(
       autofocus: true,
       onKeyEvent: _handleKeyEvent,
@@ -860,19 +877,8 @@ class _EmployeeLoginScreenState extends ConsumerState<EmployeeLoginScreen>
             ),
             data: (staff) {
               final activeUser = auth.isLocked ? auth.lockedUser : _selectedUser;
-              
-              // Automatically select locked user if terminal is locked
-              if (auth.isLocked && _selectedUser?.id != auth.lockedUser?.id) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  setState(() {
-                    _selectedUser = auth.lockedUser;
-                  });
-                });
-              }
 
               final leftWidth = (context.screenWidth * 0.36).clamp(270.0, 390.0);
-
-
 
               return isVertical
                   ? Column(

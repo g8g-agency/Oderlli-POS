@@ -14,6 +14,8 @@ abstract final class AppRoutes {
   static const String shifts = '/shifts';
   static const String settings = '/settings';
   static const String menu = '/menu';
+  static const String posMenu = '/pos/menu';
+  static const String tableSelection = '/table-selection';
   static const String cart = '/cart';
 
   // Checkout nested shell routes

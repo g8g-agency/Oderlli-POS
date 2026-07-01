@@ -65,7 +65,7 @@ class KitchenRepository {
       throw const StaleKitchenStateException();
     }
 
-    if (statusCode == 422) {
+    if (statusCode == 400 || statusCode == 422) {
       final data = e.response?.data;
       String msg = 'Validation error';
       if (data is Map<String, dynamic> && data['error'] != null) {
@@ -87,6 +87,7 @@ class KitchenRepository {
 
   /// GET /api/v1/kitchen/tickets
   Future<List<KitchenTicket>> getTickets({
+    required String branchId,
     String? status,
     String? stationId,
   }) async {
@@ -95,7 +96,11 @@ class KitchenRepository {
     }
 
     try {
-      return await _service.fetchTickets(status: status, stationId: stationId);
+      return await _service.fetchTickets(
+        branchId: branchId,
+        status: status,
+        stationId: stationId,
+      );
     } on DioException catch (e) {
       if (kDebugMode && AppConfig.allowMockFallbackInDebug) {
         return _mockTickets();
