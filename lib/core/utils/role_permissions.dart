@@ -2,10 +2,10 @@ import '../../models/pos_user.dart';
 
 /// Centralized security checks mapping roles to system capabilities.
 abstract final class RolePermissions {
-  /// Reports and Analytics access (Alexander / Manager only).
+  /// Reports and Analytics access (Manager only).
   static bool canAccessReports(UserRole role) => role == UserRole.manager;
 
-  /// Settings and configurations (Alexander / Manager only).
+  /// Settings and configurations (Manager only).
   static bool canManageSettings(UserRole role) => role == UserRole.manager;
 
   /// Shift closing operations (Manager only, Cashier/Server requires override).

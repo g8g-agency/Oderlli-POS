@@ -19,7 +19,6 @@ class PaymentsScreen extends ConsumerStatefulWidget {
 
 class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   int _activeTab = 0; // 0: Cash, 1: Card, 2: UPI, 3: Mixed Payment
-  bool _isProcessing = false;
   String? _loadingMessage;
   
   // Cash mode states
@@ -74,17 +73,16 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   }
 
   // Helper to calculate totals based on active mode
-  double _getCurrentTenderedAmount(double remainingVal) {
+  int _getCurrentTenderedAmountPaise(int remainingPaise) {
     if (_activeTab == 0) {
-      return double.tryParse(_cashTendered) ?? 0.0;
+      final raw = double.tryParse(_cashTendered) ?? 0.0;
+      return (raw * 100).round();
     } else if (_activeTab == 1 || _activeTab == 2) {
-      // Card or UPI defaults to exact remaining balance if not customized
-      return remainingVal;
+      return remainingPaise;
     } else {
-      // Mixed Payment mode
-      final c = double.tryParse(_mixedCashController.text) ?? 0.0;
-      final d = double.tryParse(_mixedCardController.text) ?? 0.0;
-      final u = double.tryParse(_mixedUpiController.text) ?? 0.0;
+      final c = ((double.tryParse(_mixedCashController.text) ?? 0.0) * 100).round();
+      final d = ((double.tryParse(_mixedCardController.text) ?? 0.0) * 100).round();
+      final u = ((double.tryParse(_mixedUpiController.text) ?? 0.0) * 100).round();
       return c + d + u;
     }
   }
@@ -99,8 +97,10 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   }
 
   Future<void> _onCompletePayment(double remainingVal) async {
+    // Clear any prior payment error before starting
+    ref.read(activeBillProvider.notifier).clearPaymentError();
+
     setState(() {
-      _isProcessing = true;
       if (_activeTab == 0) {
         _loadingMessage = 'Recording Cash Payment...';
       } else if (_activeTab == 1) {
@@ -128,93 +128,139 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     if (!mounted) return;
 
     final billNotifier = ref.read(activeBillProvider.notifier);
+    final billState = ref.read(activeBillProvider);
+    if (billState == null) return;
     
-    if (_activeTab == 0) {
-      // Cash payment
-      final amount = _getCurrentTenderedAmount(remainingVal);
-      if (amount <= 0) {
-        setState(() {
-          _isProcessing = false;
-        });
-        return;
-      }
-      final appliedAmount = amount > remainingVal ? remainingVal : amount;
-      billNotifier.addPayment('Cash', appliedAmount);
-      
-      final change = amount - remainingVal;
-      if (change > 0) {
-        context.showSuccessSnack('Payment successful! Return change: ${change.asCurrency}');
+    final remainingPaise = billState.amountRemainingPaise;
+    try {
+      if (_activeTab == 0) {
+        // Cash payment
+        final amountPaise = _getCurrentTenderedAmountPaise(remainingPaise);
+        if (amountPaise <= 0) {
+          return;
+        }
+        final appliedAmountPaise = amountPaise > remainingPaise ? remainingPaise : amountPaise;
+        final appliedAmount = appliedAmountPaise / 100.0;
+        await billNotifier.addPayment('Cash', appliedAmount);
+        if (!mounted) return;
+        
+        final changePaise = amountPaise - remainingPaise;
+        final change = changePaise / 100.0;
+        if (change > 0) {
+          context.showSuccessSnack('Payment successful! Return change: ${change.asCurrency}');
+        } else {
+          context.showSuccessSnack('Cash payment of ${appliedAmount.asCurrency} recorded.');
+        }
+      } else if (_activeTab == 1) {
+        // Card payment
+        await billNotifier.addPayment('Card', remainingVal);
+        if (!mounted) return;
+        context.showSuccessSnack('Card payment of ${remainingVal.asCurrency} completed via PX terminal.');
+      } else if (_activeTab == 2) {
+        // UPI payment
+        await billNotifier.addPayment('UPI', remainingVal);
+        if (!mounted) return;
+        context.showSuccessSnack('UPI payment of ${remainingVal.asCurrency} scanned & approved.');
       } else {
-        context.showSuccessSnack('Cash payment of ${appliedAmount.asCurrency} recorded.');
+        // Mixed Payment mode
+        final cashVal = double.tryParse(_mixedCashController.text) ?? 0.0;
+        final cardVal = double.tryParse(_mixedCardController.text) ?? 0.0;
+        final upiVal = double.tryParse(_mixedUpiController.text) ?? 0.0;
+        
+        int transactionCount = 0;
+        if (cashVal > 0) {
+          await billNotifier.addPayment('Cash', cashVal);
+          if (!mounted) return;
+          transactionCount++;
+        }
+        if (cardVal > 0) {
+          await billNotifier.addPayment('Card', cardVal);
+          if (!mounted) return;
+          transactionCount++;
+        }
+        if (upiVal > 0) {
+          await billNotifier.addPayment('UPI', upiVal);
+          if (!mounted) return;
+          transactionCount++;
+        }
+        
+        if (transactionCount > 0) {
+          context.showSuccessSnack('Multi-tender payment recorded ($transactionCount transactions).');
+        }
       }
-    } else if (_activeTab == 1) {
-      // Card payment
-      billNotifier.addPayment('Card', remainingVal);
-      context.showSuccessSnack('Card payment of ${remainingVal.asCurrency} completed via PX terminal.');
-    } else if (_activeTab == 2) {
-      // UPI payment
-      billNotifier.addPayment('UPI', remainingVal);
-      context.showSuccessSnack('UPI payment of ${remainingVal.asCurrency} scanned & approved.');
-    } else {
-      // Mixed Payment mode
-      final cashVal = double.tryParse(_mixedCashController.text) ?? 0.0;
-      final cardVal = double.tryParse(_mixedCardController.text) ?? 0.0;
-      final upiVal = double.tryParse(_mixedUpiController.text) ?? 0.0;
-      
-      int transactionCount = 0;
-      if (cashVal > 0) {
-        billNotifier.addPayment('Cash', cashVal);
-        transactionCount++;
+
+      if (!mounted) return;
+
+      // Only navigate away if no error was set by the provider
+      final postPaymentState = ref.read(activeBillProvider);
+      if (postPaymentState?.paymentError != null) {
+        throw Exception(postPaymentState!.paymentError);
       }
-      if (cardVal > 0) {
-        billNotifier.addPayment('Card', cardVal);
-        transactionCount++;
-      }
-      if (upiVal > 0) {
-        billNotifier.addPayment('UPI', upiVal);
-        transactionCount++;
-      }
-      
-      if (transactionCount > 0) {
-        context.showSuccessSnack('Multi-tender payment recorded ($transactionCount transactions).');
-      }
+      context.go('/checkout');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              _onCompletePayment(remainingVal);
+            },
+            child: const Text('Payment could not be saved — tap to retry'),
+          ),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 10),
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: () {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              _onCompletePayment(remainingVal);
+            },
+          ),
+        ),
+      );
     }
-
-    setState(() {
-      _isProcessing = false;
-    });
-
-    context.go('/checkout');
   }
 
   @override
   Widget build(BuildContext context) {
     final billState = ref.watch(activeBillProvider);
 
-    if (billState == null) {
+    if (billState == null || !billState.paymentsHydrated) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );
     }
 
+    final isProcessing = billState.isSubmittingPayment;
+    final paymentError = billState.paymentError;
+
     final totalBill = billState.total;
     final amountPaid = billState.amountPaid;
-    final remainingVal = billState.amountRemaining;
     
-    final currentTendered = _getCurrentTenderedAmount(remainingVal);
+    final remainingPaise = billState.amountRemainingPaise;
+    final remainingVal = remainingPaise / 100.0;
+    
+    final currentTenderedPaise = _getCurrentTenderedAmountPaise(remainingPaise);
+    final currentTendered = currentTenderedPaise / 100.0;
     
     // Settlement calculations
-    final newRemaining = (remainingVal - currentTendered).clamp(0.0, double.infinity);
-    final changeDue = (currentTendered - remainingVal).clamp(0.0, double.infinity);
+    final newRemainingPaise = (remainingPaise - currentTenderedPaise).clamp(0, 999999999);
+    final changeDuePaise = (currentTenderedPaise - remainingPaise).clamp(0, 999999999);
+    
+    final newRemaining = newRemainingPaise / 100.0;
+    final changeDue = changeDuePaise / 100.0;
     
     // Settlement preview message & color
     String settlementText;
     Color settlementColor;
-    if (currentTendered <= 0.01) {
+    if (currentTenderedPaise <= 0) {
       settlementText = 'No payment entered';
       settlementColor = AppColors.textSecondary;
-    } else if (currentTendered >= remainingVal - 0.01) {
-      if (changeDue > 0.01) {
+    } else if (currentTenderedPaise >= remainingPaise) {
+      if (changeDuePaise > 0) {
         settlementText = 'Sufficient - Change Due: ${changeDue.asCurrency}';
         settlementColor = AppColors.cash;
       } else {
@@ -227,7 +273,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     }
 
     return LoadingOverlay(
-      isLoading: _isProcessing,
+      isLoading: isProcessing,
       message: _loadingMessage,
       child: Padding(
         padding: EdgeInsets.all(16.r),
@@ -236,6 +282,48 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
           children: [
             Text('Select Payment Method', style: AppTextStyles.headlineMedium),
             Gap(16.h),
+
+            // ── 0. Payment Error Banner ──────────────────────────────────────
+            if (paymentError != null)
+              Padding(
+                padding: EdgeInsets.only(bottom: 12.h),
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.errorContainer,
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          color: AppColors.error, size: 22.sp),
+                      Gap(12.w),
+                      Expanded(
+                        child: Text(
+                          paymentError,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Gap(8.w),
+                      IconButton(
+                        onPressed: () => ref
+                            .read(activeBillProvider.notifier)
+                            .clearPaymentError(),
+                        icon: Icon(Icons.close,
+                            color: AppColors.error, size: 18.sp),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        tooltip: 'Dismiss',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
             // ── 1. Tab headers (Cash, Card, UPI, Mixed) ──────────────────────
             Row(
@@ -262,7 +350,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                           POSCard(
                             child: Container(
                               constraints: BoxConstraints(minHeight: 260.h),
-                              child: _buildActiveTabContent(remainingVal),
+                              child: _buildActiveTabContent(remainingPaise),
                             ),
                           ),
                           Gap(12.h),
@@ -285,7 +373,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                         // Left Panel: Active tab layout content (expanded)
                         Expanded(
                           child: POSCard(
-                            child: _buildActiveTabContent(remainingVal),
+                            child: _buildActiveTabContent(remainingPaise),
                           ),
                         ),
                         Gap(16.w),
@@ -319,6 +407,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     String settlementText, {
     bool isScrollable = false,
   }) {
+    final billState = ref.read(activeBillProvider);
+    final remainingPaise = billState?.amountRemainingPaise ?? 0;
+    final currentTenderedPaise = _getCurrentTenderedAmountPaise(remainingPaise);
+    final totalTenderedPaise = (billState?.amountPaidPaise ?? 0) + currentTenderedPaise;
+    final grandTotalPaise = billState?.grandTotalPaise ?? 0;
+    final canComplete = totalTenderedPaise >= grandTotalPaise;
+
     return POSCard(
       backgroundColor: AppColors.surfaceVariant.withValues(alpha: 0.3),
       borderColor: AppColors.border,
@@ -380,7 +475,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
             children: [
               Expanded(
                 child: PrimaryButton(
-                  onPressed: currentTendered <= 0.01
+                  onPressed: !canComplete
                       ? null
                       : () => _onCompletePayment(remainingVal),
                   text: 'COMPLETE PAYMENT',
@@ -444,23 +539,23 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     );
   }
 
-  Widget _buildActiveTabContent(double remainingVal) {
+  Widget _buildActiveTabContent(int remainingPaise) {
     switch (_activeTab) {
       case 0:
-        return _buildCashContent(remainingVal);
+        return _buildCashContent(remainingPaise);
       case 1:
         return _buildCardContent();
       case 2:
         return _buildUpiContent();
       case 3:
-        return _buildMixedContent(remainingVal);
+        return _buildMixedContent(remainingPaise);
       default:
         return Container();
     }
   }
 
   // CASH MODE LAYOUT
-  Widget _buildCashContent(double remainingVal) {
+  Widget _buildCashContent(int remainingPaise) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -498,7 +593,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 children: [
                   _buildQuickCashButton(
                     'Exact Cash',
-                    () => setState(() => _cashTendered = remainingVal.toStringAsFixed(2)),
+                    () => setState(() => _cashTendered = (remainingPaise / 100.0).toStringAsFixed(2)),
                   ),
                   Gap(8.w),
                   _buildQuickCashButton(
@@ -656,7 +751,8 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   }
 
   // MIXED PAYMENT MODE LAYOUT
-  Widget _buildMixedContent(double remainingVal) {
+  Widget _buildMixedContent(int remainingPaise) {
+    final remainingVal = remainingPaise / 100.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

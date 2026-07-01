@@ -149,6 +149,10 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
 
   /// Load cart details from the backend/repository
   Future<void> loadCart() async {
+    if (ref == null) return;
+    final user = ref!.read(authProvider).user;
+    if (user == null) return;
+
     if (tenantId == null || branchId == null) {
       state = state.copyWith(isLoading: false);
       return;
@@ -428,6 +432,9 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
 
   /// Clear the cart completely (locally / session reset)
   void clear() {
+    if (tableId != null) {
+      repository.evictTableSession(tableId!);
+    }
     state = const POSCartState();
   }
 
@@ -485,8 +492,14 @@ final posCartProvider = StateNotifierProvider<POSCartNotifier, POSCartState>((re
     tableId: selectedTableId,
   );
 
-  // Load cart when branch context is available (counter uses sentinel table id).
-  if (sessionIds.tenantId != null && sessionIds.branchId != null) {
+  // Only load from backend when we have a real table selected.
+  // Counter orders and null table start with an empty local cart.
+  final isRealTable = selectedTableId != null &&
+      !PosConstants.isCounterTable(selectedTableId);
+
+  if (isRealTable &&
+      sessionIds.tenantId != null &&
+      sessionIds.branchId != null) {
     notifier.loadCart();
   }
 

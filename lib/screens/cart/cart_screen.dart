@@ -322,10 +322,39 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                return;
                              }
 
+                             // For real table orders, require a valid backend cart
+                             final isCounter = isCounterOrder ||
+                                 PosConstants.isCounterTable(checkoutTableId);
+                             if (!isCounter && (cartState.backendCartId == null ||
+                                 cartState.backendCartId!.isEmpty)) {
+                               setState(() => _isSending = false);
+                               this.context.showErrorSnack(
+                                 'Cart not synced with server yet. Please wait and retry.'
+                               );
+                               return;
+                             }
+
                              final sessionIds = ref.read(cartSessionIdsProvider);
-                             final tenantId = sessionIds.tenantId ?? 'tenant-mock';
-                             final checkoutBranchId = sessionIds.branchId ?? 'branch-mock';
-                             final cartId = cartState.backendCartId ?? 'cart-placeholder';
+                             final tenantId = sessionIds.tenantId ?? '';
+                             final checkoutBranchId = sessionIds.branchId ?? '';
+                             final cartId = cartState.backendCartId ?? '';
+
+                             // TODO: tenantId/branchId should never be empty here — if this fires, trace auth state init order in CartScreen's parent route.
+                             assert(tenantId.isNotEmpty && checkoutBranchId.isNotEmpty,
+                               'CartScreen: tenantId or branchId is empty — auth state was not ready when this screen built.');
+
+                             if (tenantId.isEmpty || checkoutBranchId.isEmpty) {
+                               // Surface a visible error instead of sending an empty-string UUID to the backend
+                               if (mounted) {
+                                 ScaffoldMessenger.of(context).showSnackBar(
+                                   const SnackBar(content: Text('Session not ready. Please go back and try again.')),
+                                 );
+                               }
+                               setState(() {
+                                 _isSending = false;
+                               });
+                               return;
+                             }
 
                              try {
                                await ref.read(ordersProvider.notifier).checkout(

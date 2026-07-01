@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/auth_provider.dart';
 import '../constants/app_config.dart';
 import 'device_fingerprint_service.dart';
 import 'secure_storage_service.dart';
@@ -9,6 +11,7 @@ class DioClient {
   final Dio dio;
   final SecureStorageService _secureStorage;
   final DeviceFingerprintService _fingerprintService;
+  final Ref? _ref;
 
   // Stream controller to notify when a session has expired (refresh failed)
   final _sessionExpiredController = StreamController<void>.broadcast();
@@ -20,8 +23,9 @@ class DioClient {
 
   DioClient(
     this._secureStorage,
-    this._fingerprintService,
-  ) : dio = Dio(BaseOptions(
+    this._fingerprintService, [
+    this._ref,
+  ]) : dio = Dio(BaseOptions(
           baseUrl: AppConfig.baseUrl,
           connectTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 10),
@@ -43,15 +47,32 @@ class DioClient {
           final fingerprint = await _fingerprintService.getOrCreateFingerprint();
           options.headers['X-Device-Fingerprint'] = fingerprint;
 
-          // Inject Access Token header (if available)
-          final credentials = await _secureStorage.getCredentials();
-          final accessToken = credentials['accessToken'];
-          debugPrint('[AUTH] getAccessToken returned: $accessToken');
-          if (accessToken != null && accessToken.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $accessToken';
-            debugPrint('[AUTH] AUTHORIZATION HEADER ADDED: Bearer $accessToken');
+          // Inject tenant id if present in auth state and not already set
+          if (_ref != null) {
+            final authState = _ref.read(authProvider);
+            if (authState.tenantId != null && !options.headers.containsKey('x-tenant-id')) {
+              options.headers['x-tenant-id'] = authState.tenantId;
+            }
+          }
+
+          // Inject Access/Runtime Token header (if not already set manually)
+          if (!options.headers.containsKey('Authorization')) {
+            final staffToken = await _secureStorage.getRuntimeToken();
+            if (staffToken != null && staffToken.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $staffToken';
+              debugPrint('[AUTH] STAFF RUNTIME HEADER ADDED: Bearer $staffToken');
+            } else {
+              final credentials = await _secureStorage.getCredentials();
+              final accessToken = credentials['accessToken'];
+              if (accessToken != null && accessToken.isNotEmpty) {
+                options.headers['Authorization'] = 'Bearer $accessToken';
+                debugPrint('[AUTH] OWNER AUTHORIZATION HEADER ADDED: Bearer $accessToken');
+              } else {
+                debugPrint('[AUTH] AUTHORIZATION HEADER NOT ADDED (token is null/empty)');
+              }
+            }
           } else {
-            debugPrint('[AUTH] AUTHORIZATION HEADER NOT ADDED (token is null/empty)');
+            debugPrint('[AUTH] AUTHORIZATION HEADER PRESERVED: ${options.headers['Authorization']}');
           }
 
           if (kDebugMode) {
@@ -79,9 +100,22 @@ class DioClient {
 
           // If the request was unauthorized, attempt token refresh
           if (error.response?.statusCode == 401) {
+            final path = error.requestOptions.path;
+
+            // These endpoints return 401 for wrong credentials — that is
+            // expected, not a session expiry. Pass through untouched.
+            final isAuthEndpoint =
+                path.contains('/auth/staff') ||
+                path.contains('/auth/login') ||
+                path.contains('/auth/pin');
+
+            if (isAuthEndpoint) {
+              return handler.next(error); // let it bubble as DioException
+            }
+
             // Avoid infinite loops if refreshing fails
-            if (error.requestOptions.path.contains('/auth/refresh') ||
-                error.requestOptions.path.contains('/auth/login')) {
+            if (path.contains('/auth/refresh') ||
+                path.contains('/auth/login')) {
               return handler.next(error);
             }
 
@@ -89,7 +123,12 @@ class DioClient {
             final refreshToken = credentials['refreshToken'];
             final deviceSessionId = credentials['deviceSessionId'];
 
-            if (refreshToken == null || deviceSessionId == null) {
+            if (refreshToken == null || refreshToken.trim().isEmpty) {
+              _triggerSessionExpired();
+              return handler.next(error);
+            }
+
+            if (deviceSessionId == null) {
               _triggerSessionExpired();
               return handler.next(error);
             }
@@ -157,9 +196,14 @@ class DioClient {
         final data = refreshResponse.data;
         if (data != null && data['success'] == true) {
           final resData = data['data'];
-          final newAccessToken = resData['access_token'] as String;
-          final newRefreshToken = resData['refresh_token'] as String;
-          final newDeviceSessionId = resData['device_session_id'] as String;
+          
+          final newAccessToken = resData?['access_token'] as String?;
+          final newRefreshToken = resData?['refresh_token'] as String?;
+          final newDeviceSessionId = resData?['device_session_id'] as String?;
+
+          if (newAccessToken == null || newRefreshToken == null || newDeviceSessionId == null) {
+            throw Exception('Token response contains null values');
+          }
 
           await _secureStorage.saveTokens(
             accessToken: newAccessToken,
@@ -170,13 +214,14 @@ class DioClient {
           return newAccessToken;
         }
       }
+      throw Exception('Token refresh response status code was not 200 or success flag was false');
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[DioClient] Refresh token request failed: $e');
       }
-      rethrow;
+      _triggerSessionExpired();
+      return null;
     }
-    return null;
   }
 
   void _triggerSessionExpired() {

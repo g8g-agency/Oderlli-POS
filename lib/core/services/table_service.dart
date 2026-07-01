@@ -37,15 +37,24 @@ class TableService {
   }
 
   /// GET /api/v1/admin/tables/sections
-  Future<List<TableSection>> fetchSections() async {
+  Future<List<TableSection>> fetchSections({String? branchId}) async {
     final response = await _dioClient.dio.get(
       '/api/v1/admin/tables/sections',
+      queryParameters: branchId != null ? {'branchId': branchId} : null,
     );
     _assertSuccess(response);
     final data = response.data['data'] as List<dynamic>;
     return data
         .map((e) => TableSection.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// POST /api/v1/admin/tables/:tableId/vacate
+  Future<void> vacateTable(String tableId) async {
+    final response = await _dioClient.dio.post(
+      '/api/v1/admin/tables/$tableId/vacate',
+    );
+    _assertSuccess(response);
   }
 
   void _assertSuccess(Response<dynamic> response) {

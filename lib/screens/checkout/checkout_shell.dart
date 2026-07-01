@@ -26,7 +26,7 @@ class CheckoutShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final billState = ref.watch(activeBillProvider);
 
-    if (billState == null) {
+    if (billState == null || !billState.paymentsHydrated) {
       return const Scaffold(
         backgroundColor: AppColors.background,
         body: Center(

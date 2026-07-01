@@ -91,6 +91,10 @@ class OrderRepository {
   }
 
   Future<String> _getOrResolveSessionToken(String branchId, String tableId) async {
+    if (tableId == '00000000-0000-0000-0000-000000000001') {
+      _tableSessionTokens[tableId] = 'counter-session-token';
+      return 'counter-session-token';
+    }
     if (_tableSessionTokens.containsKey(tableId)) {
       return _tableSessionTokens[tableId]!;
     }
@@ -163,7 +167,7 @@ class OrderRepository {
       final payload = {
         'cartId': cartId,
         'tableId': tableId,
-        'orderNotes': ?orderNotes,
+        'orderNotes': orderNotes,
       };
 
       final envelope = _buildMutationEnvelope(

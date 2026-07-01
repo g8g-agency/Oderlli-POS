@@ -434,35 +434,40 @@ class POSSidebar extends StatelessWidget {
           const Divider(height: 1, color: LightPOSColors.border),
           Padding(
             padding: EdgeInsets.all(AppSpacing.lg.r),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: LightPOSColors.background,
-                  radius: 20.r,
-                  child: Text(
-                    'SJ',
-                    style: LightPOSTypography.titleMedium.copyWith(color: LightPOSColors.primary),
-                  ),
-                ),
-                Gap(AppSpacing.sm.w),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Sarah Jenkins',
-                        style: LightPOSTypography.titleMedium,
-                        overflow: TextOverflow.ellipsis,
+            child: Consumer(
+              builder: (context, ref, child) {
+                final user = ref.watch(authProvider).user;
+                return Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: LightPOSColors.background,
+                      radius: 20.r,
+                      child: Text(
+                        user?.initials ?? 'ST',
+                        style: LightPOSTypography.titleMedium.copyWith(color: LightPOSColors.primary),
                       ),
-                      Text(
-                        'Cashier • Terminal 1',
-                        style: LightPOSTypography.bodySmall,
-                        overflow: TextOverflow.ellipsis,
+                    ),
+                    Gap(AppSpacing.sm.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user?.name ?? 'Staff',
+                            style: LightPOSTypography.titleMedium,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '${user?.role.label ?? 'Staff'} • Terminal 1',
+                            style: LightPOSTypography.bodySmall,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -586,7 +591,15 @@ class POSHeader extends StatelessWidget {
           children: [
             _buildMetadataItem(Icons.devices_other, 'Terminal 1'),
             _buildDotSeparator(),
-            _buildMetadataItem(Icons.person_outline, 'Sarah Jenkins'),
+            Consumer(
+              builder: (context, ref, child) {
+                final user = ref.watch(authProvider).user;
+                return _buildMetadataItem(
+                  Icons.person_outline,
+                  user?.name ?? 'Staff',
+                );
+              },
+            ),
             _buildDotSeparator(),
             _buildMetadataItem(
               Icons.table_bar_outlined,
@@ -933,6 +946,180 @@ class OrderCartPanel extends ConsumerStatefulWidget {
 
 class _OrderCartPanelState extends ConsumerState<OrderCartPanel> {
   final TextEditingController _notesController = TextEditingController();
+  bool _isAlreadyOrderedExpanded = true;
+
+  @override
+  void didUpdateWidget(OrderCartPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.activeTable?.id != oldWidget.activeTable?.id) {
+      _isAlreadyOrderedExpanded = true;
+    }
+  }
+
+  Widget _buildAlreadyOrderedSection() {
+    final tableId = ref.watch(cartSelectedTableProvider) ?? ref.watch(activeTableIdProvider);
+    if (tableId == null || PosConstants.isCounterTable(tableId)) {
+      return const SizedBox.shrink();
+    }
+
+    final activeOrder = ref.watch(activeTableOrderProvider);
+    if (activeOrder == null) {
+      return const SizedBox.shrink();
+    }
+
+    final billState = ref.watch(activeBillProvider);
+    final bool isHydrated = billState != null &&
+        billState.order.id == activeOrder.id &&
+        billState.paymentsHydrated;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: AppSpacing.md.h),
+      decoration: BoxDecoration(
+        color: LightPOSColors.background,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMD.r),
+        border: Border.all(color: LightPOSColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isAlreadyOrderedExpanded = !_isAlreadyOrderedExpanded;
+              });
+            },
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMD.r),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md.w, vertical: AppSpacing.sm.h),
+              child: Row(
+                children: [
+                  const Icon(Icons.soup_kitchen_outlined, color: LightPOSColors.primary, size: 16),
+                  Gap(8.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Already Sent to Kitchen',
+                          style: LightPOSTypography.titleMedium.copyWith(color: LightPOSColors.primary),
+                        ),
+                        Text(
+                          'Order #${activeOrder.orderNumber ?? (activeOrder.id.length > 8 ? activeOrder.id.substring(0, 8) : activeOrder.id)}',
+                          style: LightPOSTypography.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _isAlreadyOrderedExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: LightPOSColors.textSecondary,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_isAlreadyOrderedExpanded) ...[
+            const Divider(height: 1, color: LightPOSColors.border),
+            if (!isHydrated)
+              Padding(
+                padding: EdgeInsets.all(AppSpacing.md.r),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(LightPOSColors.primary),
+                      ),
+                    ),
+                    Gap(8),
+                    Text('Loading items...', style: TextStyle(fontSize: 12, color: LightPOSColors.textSecondary)),
+                  ],
+                ),
+              )
+            else ...[
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.md.w, vertical: AppSpacing.sm.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: billState.order.items.length,
+                      separatorBuilder: (_, _) => Divider(color: LightPOSColors.border.withValues(alpha: 0.5), height: AppSpacing.sm.h),
+                      itemBuilder: (context, idx) {
+                        final item = billState.order.items[idx];
+                        return Row(
+                          children: [
+                            Text('${item.quantity}× ', style: LightPOSTypography.titleMedium.copyWith(color: LightPOSColors.primary)),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.menuItem.name, style: LightPOSTypography.bodyMedium),
+                                  if (item.modifiers.isNotEmpty)
+                                    Text(
+                                      item.modifiers.join(', '),
+                                      style: LightPOSTypography.bodySmall.copyWith(fontSize: 9.sp),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              (item.menuItem.price * item.quantity).asCurrency,
+                              style: LightPOSTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    Gap(8.h),
+                    const Divider(height: 1, color: LightPOSColors.border),
+                    Gap(8.h),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Order Total', style: LightPOSTypography.titleMedium),
+                        Text(
+                          billState.total.asCurrency,
+                          style: LightPOSTypography.titleMedium.copyWith(
+                            color: LightPOSColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Gap(8.h),
+                    Container(
+                      padding: EdgeInsets.all(AppSpacing.xs.r),
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: LightPOSColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusSM.r),
+                      ),
+                      child: Text(
+                        'Submitted — view only. Add new items below to start a new round.',
+                        style: LightPOSTypography.bodySmall.copyWith(
+                          color: LightPOSColors.primary,
+                          fontSize: 9.5.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -977,6 +1164,8 @@ class _OrderCartPanelState extends ConsumerState<OrderCartPanel> {
           Gap(AppSpacing.md.h),
           const Divider(height: 1, color: LightPOSColors.border),
           Gap(AppSpacing.md.h),
+
+          _buildAlreadyOrderedSection(),
 
           // Scrollable Cart Items
           Expanded(
@@ -1092,11 +1281,51 @@ class _OrderCartPanelState extends ConsumerState<OrderCartPanel> {
               children: [
                 Expanded(
                   child: POSActionButton(
-                    onPressed: () {
-                      ref.read(posCartProvider.notifier).clear();
-                      _notesController.clear();
-                      context.showSuccessSnack('Ticket dispatched to Kitchen KDS!');
-                      context.go('/floor');
+                    onPressed: () async {
+                      // Guard: need at least one item
+                      if (widget.cartState.items.isEmpty) return;
+
+                      final sessionIds = ref.read(cartSessionIdsProvider);
+                      final tableId = ref.read(cartSelectedTableProvider) ??
+                          ref.read(activeTableIdProvider);
+
+                      debugPrint('[DEBUG] menu_screen SEND KITCHEN: tableId=$tableId, cartId=${widget.cartState.backendCartId}');
+
+                      if (tableId == null) {
+                        context.showErrorSnack('No table selected.');
+                        return;
+                      }
+
+                      final cartId = widget.cartState.backendCartId;
+                      // Counter orders use local mock cart — no backend cartId needed
+
+                      try {
+                        debugPrint('[DEBUG] menu_screen invoking ordersProvider.notifier.checkout...');
+                        await ref.read(ordersProvider.notifier).checkout(
+                          tenantId: sessionIds.tenantId ?? '',
+                          branchId: sessionIds.branchId ?? '',
+                          tableId: tableId,
+                          cartId: cartId ?? '',   // empty string for counter — backend ignores
+                          expectedCartRevision: widget.cartState.backendCartVersionNum,
+                          orderNotes: _notesController.text.isEmpty
+                              ? null
+                              : _notesController.text,
+                        );
+
+                        ref.read(posCartProvider.notifier).clear();
+                        ref.read(cartSelectedTableProvider.notifier).state = null;
+                        ref.read(activeTableIdProvider.notifier).state = null;
+                        _notesController.clear();
+
+                        if (context.mounted) {
+                          context.showSuccessSnack('Order dispatched to KDS!');
+                          context.go('/floor');
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          context.showErrorSnack(e.toString());
+                        }
+                      }
                     },
                     text: 'SEND KITCHEN',
                     icon: Icons.soup_kitchen_outlined,

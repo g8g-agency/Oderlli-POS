@@ -17,19 +17,21 @@ class KitchenService {
 
   /// Fetches the active kitchen queue. Optionally filter by [status] or [stationId].
   Future<List<KitchenTicket>> fetchTickets({
+    required String branchId,
     String? status,
     String? stationId,
   }) async {
     final response = await _dioClient.dio.get(
       '/api/v1/kitchen/tickets',
       queryParameters: {
-        'status': ?status,
-        'stationId': ?stationId,
+        'branchId': branchId,
+        'status': status,
+        'stationId': stationId,
       },
     );
     _assertSuccess(response);
 
-    final rawList = (response.data['data']['tickets'] as List<dynamic>?) ?? [];
+    final rawList = (response.data['data']['queue'] as List<dynamic>?) ?? [];
     return rawList
         .map((e) => KitchenTicket.fromJson(e as Map<String, dynamic>))
         .toList();

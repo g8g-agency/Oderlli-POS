@@ -11,6 +11,7 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/services/print_service.dart';
 import '../../providers/providers.dart';
 import '../../models/models.dart';
+import '../login/employee_login_screen.dart';
 
 class ShiftsScreen extends ConsumerWidget {
   const ShiftsScreen({super.key});
@@ -458,6 +459,7 @@ class _PayoutExpenseDialogState extends ConsumerState<_PayoutExpenseDialog> {
   final _pinController = TextEditingController();
   String _selectedCategory = 'Supplies';
   bool _isLoading = false;
+  String? _pinError;
 
   final List<String> _categories = [
     'Food & Beverage',
@@ -480,7 +482,43 @@ class _PayoutExpenseDialogState extends ConsumerState<_PayoutExpenseDialog> {
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _pinError = null;
+    });
+
+    try {
+      final staffListAsync = ref.read(staffListProvider);
+      final firstManager = staffListAsync.valueOrNull?.firstWhere(
+        (u) => u.role == UserRole.manager,
+        orElse: () => throw Exception('No manager found for this branch.'),
+      );
+
+      if (firstManager == null) {
+        throw Exception('No manager found for this branch.');
+      }
+
+      final enteredPin = _pinController.text.trim();
+      final valid = await ref.read(authProvider.notifier).validateManagerPin(enteredPin, firstManager);
+
+      if (!valid) {
+        setState(() {
+          _pinError = 'Invalid manager PIN';
+          _isLoading = false;
+        });
+        return;
+      }
+    } catch (e) {
+      setState(() {
+        _pinError = e.toString().contains('timed out')
+            ? 'Request timed out. Try again.'
+            : e.toString().contains('No manager')
+                ? 'No manager found for this branch.'
+                : 'Invalid manager PIN';
+        _isLoading = false;
+      });
+      return;
+    }
 
     await Future.delayed(const Duration(milliseconds: 800));
 
@@ -633,17 +671,15 @@ class _PayoutExpenseDialogState extends ConsumerState<_PayoutExpenseDialog> {
                       controller: _pinController,
                       obscureText: true,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.lock_outline),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.lock_outline),
                         hintText: 'Enter Supervisor PIN',
                         helperText: 'Required for audit compliance on drawer payout.',
+                        errorText: _pinError,
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Supervisor PIN is required';
-                        }
-                        if (value.trim() != '1111') {
-                          return 'Invalid Supervisor PIN';
                         }
                         return null;
                       },
@@ -697,6 +733,7 @@ class _CashDropInDialogState extends ConsumerState<_CashDropInDialog> {
   final _pinController = TextEditingController();
   bool _isDrop = true;
   bool _isLoading = false;
+  String? _pinError;
 
   @override
   void dispose() {
@@ -710,7 +747,43 @@ class _CashDropInDialogState extends ConsumerState<_CashDropInDialog> {
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _pinError = null;
+    });
+
+    try {
+      final staffListAsync = ref.read(staffListProvider);
+      final firstManager = staffListAsync.valueOrNull?.firstWhere(
+        (u) => u.role == UserRole.manager,
+        orElse: () => throw Exception('No manager found for this branch.'),
+      );
+
+      if (firstManager == null) {
+        throw Exception('No manager found for this branch.');
+      }
+
+      final enteredPin = _pinController.text.trim();
+      final valid = await ref.read(authProvider.notifier).validateManagerPin(enteredPin, firstManager);
+
+      if (!valid) {
+        setState(() {
+          _pinError = 'Invalid manager PIN';
+          _isLoading = false;
+        });
+        return;
+      }
+    } catch (e) {
+      setState(() {
+        _pinError = e.toString().contains('timed out')
+            ? 'Request timed out. Try again.'
+            : e.toString().contains('No manager')
+                ? 'No manager found for this branch.'
+                : 'Invalid manager PIN';
+        _isLoading = false;
+      });
+      return;
+    }
 
     await Future.delayed(const Duration(milliseconds: 800));
 
@@ -926,17 +999,15 @@ class _CashDropInDialogState extends ConsumerState<_CashDropInDialog> {
                       controller: _pinController,
                       obscureText: true,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.lock_outline),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.lock_outline),
                         hintText: 'Enter Supervisor PIN',
                         helperText: 'Manager override validation for cash drops.',
+                        errorText: _pinError,
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Supervisor PIN is required';
-                        }
-                        if (value.trim() != '1111') {
-                          return 'Invalid Supervisor PIN';
                         }
                         return null;
                       },
@@ -974,23 +1045,26 @@ class _CashDropInDialogState extends ConsumerState<_CashDropInDialog> {
   }
 }
 
-class _PrintXReportDialog extends StatefulWidget {
+class _PrintXReportDialog extends ConsumerStatefulWidget {
   const _PrintXReportDialog({required this.session, required this.orderCount});
   final ShiftSession session;
   final int orderCount;
 
   @override
-  State<_PrintXReportDialog> createState() => _PrintXReportDialogState();
+  ConsumerState<_PrintXReportDialog> createState() => _PrintXReportDialogState();
 }
 
-class _PrintXReportDialogState extends State<_PrintXReportDialog> {
+class _PrintXReportDialogState extends ConsumerState<_PrintXReportDialog> {
   bool _isPrinting = false;
   bool _isExporting = false;
+
+  late final DateTime _toTime = DateTime.now();
+  PaymentLedger? _lastKnownLedger;
 
   void _print() async {
     setState(() => _isPrinting = true);
 
-    const PrintService printService = MockPrintService();
+    final printService = ref.read(printServiceProvider);
     await printService.printXReport(widget.session);
 
     if (!mounted) return;
@@ -1002,7 +1076,7 @@ class _PrintXReportDialogState extends State<_PrintXReportDialog> {
   void _exportPdf() async {
     setState(() => _isExporting = true);
 
-    const PrintService printService = MockPrintService();
+    final printService = ref.read(printServiceProvider);
     await printService.exportPdf(widget.session);
 
     if (!mounted) return;
@@ -1016,11 +1090,24 @@ class _PrintXReportDialogState extends State<_PrintXReportDialog> {
     final session = widget.session;
     final isWorking = _isPrinting || _isExporting;
 
-    // Calculation constants
-    final cardSalesMock = 18500.0;
-    final upiSalesMock = 12400.0;
-    final grossSales = session.netCashSales + cardSalesMock + upiSalesMock;
-    final refundsMock = 1250.0;
+    final range = DateRange(from: session.shiftStart, to: _toTime);
+    final ledgerAsync = ref.watch(paymentLedgerProvider(range));
+
+    if (ledgerAsync.hasValue) {
+      _lastKnownLedger = ledgerAsync.value;
+    }
+
+    final ledger = _lastKnownLedger ?? const PaymentLedger(
+      cashTotal: 0,
+      cardTotal: 0,
+      upiTotal: 0,
+      refundTotal: 0,
+    );
+
+    final cardSales = ledger.cardTotal / 100.0;
+    final upiSales = ledger.upiTotal / 100.0;
+    final refunds = ledger.refundTotal / 100.0;
+    final grossSales = session.netCashSales + cardSales + upiSales;
 
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
@@ -1076,55 +1163,69 @@ class _PrintXReportDialogState extends State<_PrintXReportDialog> {
                       borderRadius: BorderRadius.circular(8.r),
                       border: Border.all(color: Colors.grey.shade300),
                     ),
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.all(16.r),
-                      child: Column(
-                        children: [
-                          Text(
-                            'ORDERLYY POS AUDIT',
-                            style: AppTextStyles.titleMedium.copyWith(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'Courier',
-                            ),
-                          ),
-                          Text(
-                            '*** SHIFT X-REPORT ***',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: Colors.black,
-                              fontFamily: 'Courier',
-                            ),
-                          ),
-                          Gap(10.h),
-                          const Divider(color: Colors.black),
-                          _buildReceiptRow('Shift ID', session.shiftId.substring(0, 12)),
-                          _buildReceiptRow('Terminal', session.terminalId),
-                          _buildReceiptRow('Cashier', session.cashierName),
-                          _buildReceiptRow('Start Time', '${session.shiftStart.shortDate} ${session.shiftStart.timeLabel}'),
-                          _buildReceiptRow('Print Time', '${DateTime.now().shortDate} ${DateTime.now().timeLabel}'),
-                          _buildReceiptRow('Shift Duration', '4 hours 30 mins'),
-                          _buildReceiptRow('Total Orders', '${widget.orderCount}'),
-                          const Divider(color: Colors.black),
+                    child: ledgerAsync.isLoading && _lastKnownLedger == null
+                        ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                        : SingleChildScrollView(
+                            padding: EdgeInsets.all(16.r),
+                            child: Column(
+                              children: [
+                                if (ledgerAsync.hasError) ...[
+                                  Text(
+                                    'Could not load ledger data.\nShowing last known values.',
+                                    textAlign: TextAlign.center,
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.error,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Courier',
+                                    ),
+                                  ),
+                                  Gap(10.h),
+                                ],
+                                Text(
+                                  'ORDERLYY POS AUDIT',
+                                  style: AppTextStyles.titleMedium.copyWith(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w900,
+                                    fontFamily: 'Courier',
+                                  ),
+                                ),
+                                Text(
+                                  '*** SHIFT X-REPORT ***',
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: Colors.black,
+                                    fontFamily: 'Courier',
+                                  ),
+                                ),
+                                Gap(10.h),
+                                const Divider(color: Colors.black),
+                                _buildReceiptRow('Shift ID', session.shiftId.substring(0, 12)),
+                                _buildReceiptRow('Terminal', session.terminalId),
+                                _buildReceiptRow('Cashier', session.cashierName),
+                                _buildReceiptRow('Start Time', '${session.shiftStart.shortDate} ${session.shiftStart.timeLabel}'),
+                                _buildReceiptRow('Print Time', '${DateTime.now().shortDate} ${DateTime.now().timeLabel}'),
+                                _buildReceiptRow('Shift Duration', '4 hours 30 mins'),
+                                _buildReceiptRow('Total Orders', '${widget.orderCount}'),
+                                const Divider(color: Colors.black),
 
-                          // Sales summary
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'SALES REVENUE SUMMARY',
-                              style: AppTextStyles.labelSmall.copyWith(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Courier',
-                              ),
-                            ),
-                          ),
-                          Gap(4.h),
-                          _buildReceiptRow('Cash Sales', CurrencyFormatter.format(session.netCashSales)),
-                          _buildReceiptRow('Card Sales (Mock)', CurrencyFormatter.format(cardSalesMock)),
-                          _buildReceiptRow('UPI Sales (Mock)', CurrencyFormatter.format(upiSalesMock)),
-                          _buildReceiptRow('Refunds (Mock)', '-${CurrencyFormatter.format(refundsMock)}'),
-                          _buildReceiptRow('Gross Sales', CurrencyFormatter.format(grossSales)),
-                          const Divider(color: Colors.black),
+                                // Sales summary
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'SALES REVENUE SUMMARY',
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Courier',
+                                    ),
+                                  ),
+                                ),
+                                Gap(4.h),
+                                _buildReceiptRow('Cash Sales', CurrencyFormatter.format(session.netCashSales)),
+                                _buildReceiptRow('Card Sales', CurrencyFormatter.format(cardSales)),
+                                _buildReceiptRow('UPI Sales', CurrencyFormatter.format(upiSales)),
+                                _buildReceiptRow('Refunds', '-${CurrencyFormatter.format(refunds)}'),
+                                _buildReceiptRow('Gross Sales', CurrencyFormatter.format(grossSales)),
+                                const Divider(color: Colors.black),
 
                           // Drawer Summary
                           Align(
@@ -1257,6 +1358,7 @@ class _CloseShiftDialogState extends ConsumerState<_CloseShiftDialog> {
   final _pinController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  String? _pinError;
 
   @override
   void dispose() {
@@ -1267,7 +1369,43 @@ class _CloseShiftDialogState extends ConsumerState<_CloseShiftDialog> {
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _pinError = null;
+    });
+
+    try {
+      final staffListAsync = ref.read(staffListProvider);
+      final firstManager = staffListAsync.valueOrNull?.firstWhere(
+        (u) => u.role == UserRole.manager,
+        orElse: () => throw Exception('No manager found for this branch.'),
+      );
+
+      if (firstManager == null) {
+        throw Exception('No manager found for this branch.');
+      }
+
+      final enteredPin = _pinController.text.trim();
+      final valid = await ref.read(authProvider.notifier).validateManagerPin(enteredPin, firstManager);
+
+      if (!valid) {
+        setState(() {
+          _pinError = 'Invalid manager PIN';
+          _isLoading = false;
+        });
+        return;
+      }
+    } catch (e) {
+      setState(() {
+        _pinError = e.toString().contains('timed out')
+            ? 'Request timed out. Try again.'
+            : e.toString().contains('No manager')
+                ? 'No manager found for this branch.'
+                : 'Invalid manager PIN';
+        _isLoading = false;
+      });
+      return;
+    }
 
     // Call state update
     ref.read(shiftProvider.notifier).closeShift();
@@ -1432,17 +1570,15 @@ class _CloseShiftDialogState extends ConsumerState<_CloseShiftDialog> {
                         controller: _pinController,
                         obscureText: true,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.lock_outline),
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.lock_outline),
                           hintText: 'Enter Supervisor PIN',
                           helperText: 'Manager override validation for cash drops.',
+                          errorText: _pinError,
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Supervisor PIN is required';
-                          }
-                          if (value.trim() != '1111') {
-                            return 'Invalid Supervisor PIN';
                           }
                           return null;
                         },
@@ -1454,17 +1590,19 @@ class _CloseShiftDialogState extends ConsumerState<_CloseShiftDialog> {
                         children: [
                           Expanded(
                             child: SecondaryButton(
-                              onPressed: () => Navigator.of(context).pop(false),
+                              onPressed: _isLoading ? null : () => Navigator.of(context).pop(false),
                               text: 'CANCEL',
                             ),
                           ),
                           Gap(16.w),
                           Expanded(
-                            child: DangerButton(
-                              onPressed: _submit,
-                              text: 'CLOSE SHIFT',
-                              icon: Icons.lock,
-                            ),
+                            child: _isLoading
+                                ? const Center(child: CircularProgressIndicator(color: AppColors.error))
+                                : DangerButton(
+                                    onPressed: _submit,
+                                    text: 'CLOSE SHIFT',
+                                    icon: Icons.lock_outline,
+                                  ),
                           ),
                         ],
                       ),

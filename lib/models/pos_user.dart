@@ -107,7 +107,7 @@ class PosUser {
         permissions: (json['permissions'] as List<dynamic>?)?.map((e) => e as String).toList() ?? const [],
       );
 
-  factory PosUser.fromBackendUser(BackendUser backendUser) {
+  factory PosUser.fromBackendUser(BackendUser backendUser, {String? terminalId}) {
     UserRole mappedRole;
     final r = backendUser.role.toUpperCase();
     if (r == 'MANAGER' || r == 'RESTAURANT_ADMIN' || r == 'SUPER_ADMIN') {
@@ -123,7 +123,7 @@ class PosUser {
       name: backendUser.fullName,
       role: mappedRole,
       pin: '', // Pin not stored in plain text user model
-      terminalId: 'Main Terminal',
+      terminalId: terminalId ?? 'POS Terminal',
       email: backendUser.email,
       permissions: backendUser.permissions,
     );

@@ -44,6 +44,12 @@ class ReceiptRequest {
     buf.writeln(_center('═' * 40));
     buf.writeln(_center(restaurantName.toUpperCase()));
     buf.writeln(_center('Branch: $branchName | $tableLabel'));
+    if (gstin != null && gstin!.isNotEmpty) {
+      buf.writeln(_center('GSTIN: $gstin'));
+    }
+    if (fssai != null && fssai!.isNotEmpty) {
+      buf.writeln(_center('FSSAI: $fssai'));
+    }
     buf.writeln(_center('═' * 40));
     buf.writeln('Date: $dateStr        Time: $timeStr');
     buf.writeln('Receipt #: $receiptNumber');
@@ -103,8 +109,6 @@ class ReceiptRequest {
     // ── Footer ──────────────────────────────────────────────
     buf.writeln(_center('Thank you for dining with us!'));
     buf.writeln(_center('Visit again soon!'));
-    if (gstin != null) buf.writeln('GSTIN: $gstin');
-    if (fssai != null) buf.writeln('FSSAI: $fssai');
     buf.writeln(_center('Powered by Orderlyy'));
 
     return buf.toString();

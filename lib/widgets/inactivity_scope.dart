@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/services/inactivity_service.dart';
-import '../providers/auth_provider.dart';
-import '../providers/pos_cart_provider.dart';
+import '../providers/providers.dart';
 import '../routes/app_router.dart';
 import '../routes/app_routes.dart';
 
@@ -23,8 +22,9 @@ class _InactivityScopeState extends ConsumerState<InactivityScope>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    final initialMinutes = ref.read(posSettingsProvider).inactivityTimeout;
     _service = InactivityService(
-      timeout: const Duration(minutes: 5),
+      timeout: Duration(minutes: initialMinutes),
       onTimeout: _handleTimeout,
     );
     _service.start();
@@ -67,6 +67,9 @@ class _InactivityScopeState extends ConsumerState<InactivityScope>
 
   @override
   Widget build(BuildContext context) {
+    final inactivityMinutes = ref.watch(posSettingsProvider.select((s) => s.inactivityTimeout));
+    _service.updateTimeout(Duration(minutes: inactivityMinutes));
+
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => _service.resetTimer(),

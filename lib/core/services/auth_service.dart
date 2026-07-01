@@ -66,7 +66,15 @@ class AuthService {
     if (response.statusCode == 200) {
       final body = response.data;
       if (body != null && body['success'] == true) {
-        final staffJson = (body['data']['staff'] as List<dynamic>?) ?? [];
+        final dynamic dataField = body['data'];
+        final List<dynamic> staffJson;
+        if (dataField is Map && dataField.containsKey('staff')) {
+          staffJson = (dataField['staff'] as List<dynamic>?) ?? [];
+        } else if (dataField is List) {
+          staffJson = dataField;
+        } else {
+          staffJson = [];
+        }
         return staffJson.map((raw) {
           final s = raw as Map<String, dynamic>;
           final roleStr = (s['role'] as String? ?? '').toLowerCase();

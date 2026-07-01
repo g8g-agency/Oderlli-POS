@@ -108,7 +108,7 @@ class OrderItem {
         'item_name_snapshot': itemNameSnapshot,
         'unit_price_minor': unitPriceMinor,
         'quantity': quantity,
-        'item_notes': notes,
+        'item_notes': notes ?? '',
       };
 
   OrderItem copyWith({
@@ -250,10 +250,10 @@ class Order {
       versionNum: (json['version_num'] ?? 1) as int,
       orderSnapshotId: json['order_snapshot_id'] as String?,
       orderNumber: json['order_number'] as String?,
-      subtotalMinor: (json['subtotal_minor'] ?? 0) as int,
-      taxTotalMinor: (json['tax_total_minor'] ?? 0) as int,
-      discountTotalMinor: (json['discount_total_minor'] ?? 0) as int,
-      grandTotalMinor: (json['grand_total_minor'] ?? 0) as int,
+      subtotalMinor: (json['subtotal_minor'] as num?)?.toInt() ?? 0,
+      taxTotalMinor: (json['tax_total_minor'] as num?)?.toInt() ?? 0,
+      discountTotalMinor: (json['discount_total_minor'] as num?)?.toInt() ?? 0,
+      grandTotalMinor: (json['grand_total_minor'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -266,7 +266,7 @@ class Order {
         'served_by': servedBy,
         'discount_percent': discountPercent,
         'tax_percent': taxPercent,
-        'order_notes': notes,
+        'order_notes': notes ?? '',
         'version_num': versionNum,
         'order_snapshot_id': orderSnapshotId,
         'order_number': orderNumber,
@@ -317,7 +317,7 @@ class OrderSummary {
       createdAt: DateTime.parse((json['created_at'] ?? DateTime.now().toIso8601String()) as String),
       tableId: (json['table_id'] ?? '') as String,
       orderNotes: json['order_notes'] as String?,
-      grandTotalMinor: (json['grand_total_minor'] ?? 0) as int,
+      grandTotalMinor: (json['grand_total_minor'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -395,7 +395,21 @@ class OrderDetail {
   double get taxAmount => taxTotalMinor / 100.0;
   double get total => grandTotalMinor / 100.0;
 
-  factory OrderDetail.fromJson(Map<String, dynamic> json, [List<OrderItem> items = const []]) {
+  factory OrderDetail.fromJson(Map<String, dynamic> json, [List<OrderItem>? items]) {
+    final List<OrderItem> parsedItems;
+    if (items != null) {
+      parsedItems = items;
+    } else if (json['items'] is List) {
+      parsedItems = (json['items'] as List)
+          .map((itemJson) => OrderItem.fromJson(
+                itemJson as Map<String, dynamic>,
+                itemJson['modifiers'] is List ? itemJson['modifiers'] : const [],
+              ))
+          .toList();
+    } else {
+      parsedItems = const [];
+    }
+
     return OrderDetail(
       id: (json['id'] ?? '') as String,
       tenantId: (json['tenant_id'] ?? '') as String,
@@ -422,11 +436,11 @@ class OrderDetail {
       updatedBy: json['updated_by'] as String?,
       createdAt: DateTime.parse((json['created_at'] ?? DateTime.now().toIso8601String()) as String),
       updatedAt: DateTime.parse((json['updated_at'] ?? DateTime.now().toIso8601String()) as String),
-      items: items,
-      subtotalMinor: (json['subtotal_minor'] ?? 0) as int,
-      taxTotalMinor: (json['tax_total_minor'] ?? 0) as int,
-      discountTotalMinor: (json['discount_total_minor'] ?? 0) as int,
-      grandTotalMinor: (json['grand_total_minor'] ?? 0) as int,
+      items: parsedItems,
+      subtotalMinor: (json['subtotal_minor'] as num?)?.toInt() ?? 0,
+      taxTotalMinor: (json['tax_total_minor'] as num?)?.toInt() ?? 0,
+      discountTotalMinor: (json['discount_total_minor'] as num?)?.toInt() ?? 0,
+      grandTotalMinor: (json['grand_total_minor'] as num?)?.toInt() ?? 0,
     );
   }
 }

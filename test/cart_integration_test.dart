@@ -1,6 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dio/dio.dart';
+import 'package:orderlli_pos/core/constants/app_config.dart';
 import 'package:orderlli_pos/core/repositories/cart_repository.dart';
 import 'package:orderlli_pos/core/services/cart_service.dart';
+import 'package:orderlli_pos/core/services/dio_client.dart';
 import 'package:orderlli_pos/core/services/connectivity_service.dart';
 import 'package:orderlli_pos/models/models.dart';
 import 'package:orderlli_pos/providers/pos_cart_provider.dart';
@@ -23,7 +26,46 @@ class MockConnectivityService extends ConnectivityService {
   }
 }
 
+// Mock service for Counter Table QR Resolution Bypass
+class CounterBypassCartService extends CartService {
+  CounterBypassCartService() : super(null as dynamic);
+
+  String? receivedSessionToken;
+
+  @override
+  Future<Cart> fetchCart(String qrSessionToken) async {
+    receivedSessionToken = qrSessionToken;
+    return Cart(
+      id: 'cart-1',
+      tenantId: 'tenant-1',
+      branchId: 'branch-1',
+      tableId: '00000000-0000-0000-0000-000000000001',
+      sessionId: 'session-1',
+      status: 'open',
+      versionNum: 1,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<String> resolveQrSessionForTable(String branchId, String tableId) async {
+    throw UnsupportedError('Should not be called for counter table');
+  }
+}
+
+class LiveConnectivityService extends ConnectivityService {
+  @override
+  Future<bool> isBackendReachable(String baseUrl, String healthEndpoint) async {
+    return true; // Live mode, no mock fallback
+  }
+}
+
 void main() {
+  setUpAll(() {
+    AppConfig.allowMockFallbackInDebug = true;
+  });
+
   group('Cart Integration Model Tests', () {
     test('CartModifier fromJson maps minor-units correctly', () {
       final json = {
@@ -130,6 +172,18 @@ void main() {
     });
   });
 
+  group('CartRepository Counter Table Bypass Tests', () {
+    test('Counter table bypasses QR session resolution and uses in-memory token', () async {
+      final mockService = CounterBypassCartService();
+      final repository = CartRepository(mockService, LiveConnectivityService());
+
+      final cart = await repository.getCart('tenant-1', 'branch-1', '00000000-0000-0000-0000-000000000001');
+
+      expect(cart.tableId, '00000000-0000-0000-0000-000000000001');
+      expect(mockService.receivedSessionToken, isNull);
+    });
+  });
+
   group('Frontend Modifier Validation Tests', () {
     final menuItemWithModifiers = MenuItem(
       id: 'item-1',
@@ -199,4 +253,232 @@ void main() {
       expect(notifier.state.errorMessage, isNull);
     });
   });
+
+  group('CartRepository Session Resolution Failure Caching Tests', () {
+    test('Known failure (e.g. 404) is cached and not retried', () async {
+      final dio = Dio();
+      int callCount = 0;
+      dio.interceptors.add(InterceptorsWrapper(
+        onRequest: (options, handler) {
+          callCount++;
+          handler.reject(DioException(
+            requestOptions: options,
+            response: Response(
+              requestOptions: options,
+              statusCode: 404,
+            ),
+          ));
+        },
+      ));
+
+      final stubDioClient = StubDioClient(dio);
+      final mockService = FailureCartService(stubDioClient);
+      final repository = CartRepository(mockService, LiveConnectivityService());
+
+      // First call should trigger resolveQrSessionForTable and fail
+      dynamic firstError;
+      try {
+        await repository.getCart('tenant-1', 'branch-1', 'table-1');
+      } catch (e) {
+        firstError = e;
+      }
+      expect(firstError, isA<CartValidationException>());
+      expect(callCount, 1);
+
+      // Second call should fail immediately from negative cache without calling resolveQrSessionForTable again
+      dynamic secondError;
+      try {
+        await repository.getCart('tenant-1', 'branch-1', 'table-1');
+      } catch (e) {
+        secondError = e;
+      }
+      expect(secondError, isA<CartValidationException>());
+      expect(callCount, 1); // Still 1!
+
+      // Clear cache and call again — should retry
+      repository.clearSessionCache();
+      dynamic thirdError;
+      try {
+        await repository.getCart('tenant-1', 'branch-1', 'table-1');
+      } catch (e) {
+        thirdError = e;
+      }
+      expect(thirdError, isA<CartValidationException>());
+      expect(callCount, 2);
+    });
+  });
+
+  group('CartRepository Retry and Eviction Tests', () {
+    late bool originalAllowMockFallback;
+
+    setUp(() {
+      originalAllowMockFallback = AppConfig.allowMockFallbackInDebug;
+      AppConfig.allowMockFallbackInDebug = false;
+    });
+
+    tearDown(() {
+      AppConfig.allowMockFallbackInDebug = originalAllowMockFallback;
+    });
+
+    test('401 error on cached token evicts cache and retries once', () async {
+      final mockService = RetryCartService();
+      final repository = CartRepository(mockService, LiveConnectivityService());
+
+      mockService.getCartStatusCodes = [200, 401, 200];
+
+      // Step 1: Prime the cache (resolves token-1)
+      final cart1 = await repository.getCart('tenant-1', 'branch-1', 'table-1');
+      expect(mockService.resolveCount, 1);
+      expect(mockService.getCartCount, 1);
+      expect(cart1.id, 'cart-1');
+
+      // Step 2: Next call uses cached token, gets 401, evicts, resolves new token-2, retries, gets 200
+      final cart2 = await repository.getCart('tenant-1', 'branch-1', 'table-1');
+      expect(mockService.resolveCount, 2);
+      expect(mockService.getCartCount, 3);
+      expect(cart2.id, 'cart-1');
+    });
+
+    test('If retried cart operation also fails, it propagates the error and does not loop', () async {
+      final mockService = RetryCartService();
+      final repository = CartRepository(mockService, LiveConnectivityService());
+
+      mockService.getCartStatusCodes = [200, 401, 401];
+
+      // Prime the cache
+      await repository.getCart('tenant-1', 'branch-1', 'table-1');
+
+      // Second call fails twice
+      dynamic error;
+      try {
+        await repository.getCart('tenant-1', 'branch-1', 'table-1');
+      } catch (e) {
+        error = e;
+      }
+      expect(error, isA<CartValidationException>());
+      expect(mockService.resolveCount, 2);
+      expect(mockService.getCartCount, 3);
+    });
+
+    test('If token was not cached, a 401 error does not trigger retry', () async {
+      final mockService = RetryCartService();
+      final repository = CartRepository(mockService, LiveConnectivityService());
+
+      mockService.getCartStatusCodes = [401];
+
+      dynamic error;
+      try {
+        await repository.getCart('tenant-1', 'branch-1', 'table-1');
+      } catch (e) {
+        error = e;
+      }
+      expect(error, isA<CartValidationException>());
+      expect(mockService.resolveCount, 1);
+      expect(mockService.getCartCount, 1);
+    });
+
+    test('If re-resolution itself throws 401, it propagates the failure without looping', () async {
+      final mockService = RetryCartService();
+      final repository = CartRepository(mockService, LiveConnectivityService());
+
+      mockService.getCartStatusCodes = [200, 401];
+      // Prime the cache
+      await repository.getCart('tenant-1', 'branch-1', 'table-1');
+
+      // Make next resolution fail
+      mockService.failResolveWith401 = true;
+
+      dynamic error;
+      try {
+        await repository.getCart('tenant-1', 'branch-1', 'table-1');
+      } catch (e) {
+        error = e;
+      }
+      expect(error, isA<CartValidationException>());
+      expect(mockService.resolveCount, 2);
+      // Fetch cart was only called for the initial check (1) and the second check using cached token (1), total 2
+      expect(mockService.getCartCount, 2);
+    });
+  });
 }
+
+class FailureCartService extends CartService {
+  FailureCartService(super.dioClient);
+}
+
+class RetryCartService extends CartService {
+  int resolveCount = 0;
+  int getCartCount = 0;
+  List<int> getCartStatusCodes = [];
+  bool failResolveWith401 = false;
+
+  RetryCartService() : super(null as dynamic);
+
+  @override
+  Future<String> resolveQrSessionForTableRaw(String branchId, String tableId) async {
+    resolveCount++;
+    if (failResolveWith401) {
+      throw DioException(
+        requestOptions: RequestOptions(path: '/api/v1/qr/resolve'),
+        response: Response(
+          requestOptions: RequestOptions(path: '/api/v1/qr/resolve'),
+          statusCode: 401,
+        ),
+      );
+    }
+    return 'token-$resolveCount';
+  }
+
+  @override
+  Future<Cart> fetchCart(String qrSessionToken) async {
+    final index = getCartCount;
+    getCartCount++;
+    if (index < getCartStatusCodes.length) {
+      final code = getCartStatusCodes[index];
+      if (code == 200) {
+        return Cart(
+          id: 'cart-1',
+          tenantId: 'tenant-1',
+          branchId: 'branch-1',
+          tableId: 'table-1',
+          sessionId: 'session-1',
+          status: 'open',
+          versionNum: 1,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      } else {
+        throw DioException(
+          requestOptions: RequestOptions(path: '/api/v1/cart'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/api/v1/cart'),
+            statusCode: code,
+          ),
+        );
+      }
+    }
+    return Cart(
+      id: 'cart-1',
+      tenantId: 'tenant-1',
+      branchId: 'branch-1',
+      tableId: 'table-1',
+      sessionId: 'session-1',
+      status: 'open',
+      versionNum: 1,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+}
+
+class StubDioClient implements DioClient {
+  @override
+  final Dio dio;
+
+  StubDioClient(this.dio);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+

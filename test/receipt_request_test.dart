@@ -126,4 +126,35 @@ void main() {
     expect(withLegal, contains('GSTIN: 29ABCDE1234F1Z5'));
     expect(withLegal, contains('FSSAI: 12345678901234'));
   });
+
+  test('GSTIN present and FSSAI absent', () {
+    final request = ReceiptRequest(
+      order: _sampleOrder(),
+      restaurantName: 'Grand Spice',
+      branchName: 'Downtown',
+      cashierName: 'Priya',
+      paymentMethod: 'Cash',
+      amountPaid: 200,
+      gstin: '29ABCDE1234F1Z5',
+    );
+    final text = request.toReceiptText();
+    expect(text, contains('Branch: Downtown | Table 3'));
+    expect(text, contains('GSTIN: 29ABCDE1234F1Z5'));
+    expect(text, isNot(contains('FSSAI:')));
+  });
+
+  test('GSTIN absent and FSSAI present', () {
+    final request = ReceiptRequest(
+      order: _sampleOrder(),
+      restaurantName: 'Grand Spice',
+      branchName: 'Downtown',
+      cashierName: 'Priya',
+      paymentMethod: 'Cash',
+      amountPaid: 200,
+      fssai: '12345678901234',
+    );
+    final text = request.toReceiptText();
+    expect(text, isNot(contains('GSTIN:')));
+    expect(text, contains('FSSAI: 12345678901234'));
+  });
 }

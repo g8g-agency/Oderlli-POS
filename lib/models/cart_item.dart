@@ -96,7 +96,7 @@ class CartItem {
         'item_sku_snapshot': itemSkuSnapshot,
         'unit_price_minor_snapshot': unitPriceMinorSnapshot,
         'quantity': quantity,
-        'item_notes': itemNotes,
+        'item_notes': itemNotes ?? '',
         'display_order': displayOrder,
         'version_num': versionNum,
         'created_at': createdAt.toIso8601String(),

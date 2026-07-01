@@ -1,5 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/models.dart';
+import '../constants/app_config.dart';
+import './network_print_service.dart';
+import '../../providers/providers.dart';
+
+/// Exception thrown when printing operations fail.
+class PrinterException implements Exception {
+  final String message;
+  const PrinterException(this.message);
+
+  @override
+  String toString() => 'PrinterException: $message';
+}
 
 /// Print service interface for POS shift audit summaries and receipts.
 abstract class PrintService {
@@ -9,6 +21,14 @@ abstract class PrintService {
 }
 
 final printServiceProvider = Provider<PrintService>((ref) {
+  final settings = ref.watch(posSettingsProvider);
+  final printerIp = settings.billingPrinterIp;
+  if (printerIp.isNotEmpty) {
+    return NetworkPrintService(printerIp: printerIp);
+  }
+  if (AppConfig.printerIp.isNotEmpty) {
+    return NetworkPrintService(printerIp: AppConfig.printerIp);
+  }
   return const MockPrintService();
 });
 

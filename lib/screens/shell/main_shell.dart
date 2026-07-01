@@ -157,6 +157,9 @@ class _Sidebar extends ConsumerWidget {
       if (item.route == AppRoutes.shifts) {
         return RolePermissions.canCloseShift(role);
       }
+      // if (item.route == AppRoutes.kitchen) {
+      //   return role == UserRole.manager || role == UserRole.server;
+      // }
       return true;
     }).toList();
 
@@ -216,10 +219,6 @@ class _Sidebar extends ConsumerWidget {
                   context.go('/login');
                 },
               ),
-              Gap(8.h),
-
-              // ── Alert System Demo trigger ────────────────────────────
-              _AlertsDemoButton(),
               Gap(16.h),
             ],
           );
@@ -245,6 +244,12 @@ class _Sidebar extends ConsumerWidget {
       activeIcon: Icons.table_restaurant,
       route: AppRoutes.floor,
     ),
+    // _NavItem(
+    //   label: 'Kitchen',
+    //   icon: Icons.restaurant_outlined,
+    //   activeIcon: Icons.restaurant,
+    //   route: AppRoutes.kitchen,
+    // ),
     _NavItem(
       label: 'New Order',
       icon: Icons.shopping_bag_outlined,

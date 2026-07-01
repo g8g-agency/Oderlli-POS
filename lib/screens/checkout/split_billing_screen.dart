@@ -85,7 +85,7 @@ class _SplitBillingScreenState extends ConsumerState<SplitBillingScreen> {
   Widget build(BuildContext context) {
     final billState = ref.watch(activeBillProvider);
 
-    if (billState == null) {
+    if (billState == null || !billState.paymentsHydrated) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );

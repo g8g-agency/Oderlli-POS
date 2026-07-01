@@ -44,7 +44,7 @@ class OrderService {
       '/api/v1/orders',
       queryParameters: {
         'branchId': branchId,
-        'status': ?status,
+        'status': status,
       },
     );
     _assertSuccess(response);

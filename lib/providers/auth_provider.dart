@@ -7,6 +7,7 @@ import '../core/services/device_fingerprint_service.dart';
 import '../core/services/dio_client.dart';
 import '../core/services/secure_storage_service.dart';
 import '../core/services/auth_service.dart';
+import '../core/services/realtime_sync_service.dart';
 import '../core/repositories/auth_repository.dart';
 import '../models/models.dart';
 import 'shift_provider.dart';
@@ -36,6 +37,22 @@ class AuthState {
   final String? branchName;
   final List<BranchInfo> availableBranches;
   final bool isOrgAuthenticated;
+
+  String? get gstin {
+    if (branchId == null) return null;
+    for (final b in availableBranches) {
+      if (b.id == branchId) return b.gstin;
+    }
+    return null;
+  }
+
+  String? get fssai {
+    if (branchId == null) return null;
+    for (final b in availableBranches) {
+      if (b.id == branchId) return b.fssai;
+    }
+    return null;
+  }
 
   AuthState copyWith({
     PosUser? Function()? user,
@@ -81,7 +98,7 @@ final connectivityServiceProvider = Provider<ConnectivityService>((ref) {
 final dioClientProvider = Provider<DioClient>((ref) {
   final secureStorage = ref.watch(secureStorageProvider);
   final fingerprint = ref.watch(fingerprintServiceProvider);
-  return DioClient(secureStorage, fingerprint);
+  return DioClient(secureStorage, fingerprint, ref);
 });
 
 final authServiceProvider = Provider<AuthService>((ref) {
@@ -124,8 +141,47 @@ class AuthNotifier extends StateNotifier<AuthState> {
   static const _isOrgAuthKey = 'is_org_authenticated';
 
   void _handleSessionExpired() {
-    // Reset session and force user to log in again if token is expired/invalid
-    logout();
+    // Don't wipe org/branch context — only clear the active user session
+    // so the router lands on employee login, not org login
+    state = state.copyWith(
+      user: () => null,
+      isLocked: false,
+      lockedUser: () => null,
+      errorMessage: () => 'Session expired. Please sign in again.',
+    );
+    // Clear staff token from secure storage but keep org token
+    try {
+      _ref.read(authRepositoryProvider).clearStaffSession();
+    } catch (_) {}
+  }
+
+  Future<void> logoutLocally() async {
+    final oldUser = state.user ?? state.lockedUser;
+    if (oldUser != null) {
+      _logToShift(
+        type: ShiftTransactionType.shiftClosed,
+        title: 'User Signed Out',
+        subtitle: '${oldUser.name} closed session',
+        performedBy: oldUser.name,
+      );
+    }
+
+    state = const AuthState();
+
+    try {
+      final secureStorage = _ref.read(secureStorageProvider);
+      await secureStorage.clearSession();
+    } catch (_) {}
+
+    _ref.read(realtimeSyncServiceProvider).dispose();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_userPrefKey);
+    await prefs.remove(_lockedPrefKey);
+    await prefs.remove(_tenantIdKey);
+    await prefs.remove(_branchIdKey);
+    await prefs.remove(_branchNameKey);
+    await prefs.setBool(_isOrgAuthKey, false);
   }
 
   /// Loads persisted user and locked state from storage on app start.
@@ -156,6 +212,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
           // Fetch branches in the background to keep list fresh
           fetchBranches().catchError((_) {});
         }
+        if (branchId != null) {
+          _ref.read(realtimeSyncServiceProvider).subscribe(branchId, _ref);
+        }
+        return;
+      }
+
+      // restoreSession returned null → verify the access token actually exists
+      // before trusting stale SharedPreferences data.
+      final secureStorage = _ref.read(secureStorageProvider);
+      final credentials = await secureStorage.getCredentials();
+      final hasValidToken = credentials['accessToken'] != null &&
+          credentials['accessToken']!.isNotEmpty;
+
+      if (!hasValidToken && isOrgAuthenticated) {
+        // Stale session: prefs say authenticated but token is gone.
+        // Clear stale prefs and return a clean unauthenticated state
+        // so the router redirects to the login screen instead of
+        // firing API calls without a token (which causes 401 cascades).
+        await prefs.remove(_userPrefKey);
+        await prefs.remove(_lockedPrefKey);
+        await prefs.remove(_tenantIdKey);
+        await prefs.remove(_branchIdKey);
+        await prefs.remove(_branchNameKey);
+        await prefs.setBool(_isOrgAuthKey, false);
+        state = const AuthState();
         return;
       }
 
@@ -176,6 +257,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         if (isOrgAuthenticated && tenantId != null) {
           fetchBranches().catchError((_) {});
+        }
+        if (branchId != null) {
+          _ref.read(realtimeSyncServiceProvider).subscribe(branchId, _ref);
         }
       } else {
         state = AuthState(
@@ -300,6 +384,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         lockedUser: () => null,
       );
 
+      if (state.branchId != null) {
+        _ref.read(realtimeSyncServiceProvider).subscribe(state.branchId!, _ref);
+      }
+
       await _saveSessionLocally();
 
       _logToShift(
@@ -311,10 +399,60 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       return true;
     } catch (e) {
+      // Only update loading + error — preserve ALL org/branch context
+      // so the router does not redirect away from the employee login screen
       state = state.copyWith(
         isLoading: false,
-        errorMessage: () => 'Invalid PIN code',
+        errorMessage: () => 'Invalid PIN. Please try again.',
       );
+      return false;
+    }
+  }
+
+  /// Validates a manager's PIN against the backend without altering the active session.
+  Future<bool> validateManagerPin(String pin, PosUser manager) async {
+    try {
+      final tenantId = state.tenantId;
+      final branchId = state.branchId;
+      if (tenantId == null || branchId == null) {
+        return false;
+      }
+
+      final employeeId = (manager.employeeId != null && manager.employeeId!.isNotEmpty)
+          ? manager.employeeId!
+          : manager.id;
+
+      final dioClient = _ref.read(dioClientProvider);
+      final response = await dioClient.dio.post(
+        '/auth/staff/login',
+        data: {
+          'tenantId': tenantId,
+          'branchId': branchId,
+          'employeeId': employeeId,
+          'pin': pin,
+          'email': manager.email,
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 3),
+          sendTimeout: const Duration(seconds: 3),
+        ),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final body = response.data;
+        if (body != null && body['success'] == true) {
+          return true;
+        }
+      }
+      return false;
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        throw Exception('Request timed out. Try again.');
+      }
+      return false;
+    } catch (_) {
       return false;
     }
   }
@@ -327,9 +465,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final ok = await loginOrganization(user.email ?? '', pin == '1234' ? 'Test@123456' : pin);
       if (!ok) return false;
       await selectBranch('br-royal-1', 'Royal Tandoor - Main Branch');
-      return loginEmployee(user, '1234');
+      final success = await loginEmployee(user, '1234');
+      if (success && state.branchId != null) {
+        _ref.read(realtimeSyncServiceProvider).subscribe(state.branchId!, _ref);
+      }
+      return success;
     }
-    return loginEmployee(user, pin);
+    final success = await loginEmployee(user, pin);
+    if (success && state.branchId != null) {
+      _ref.read(realtimeSyncServiceProvider).subscribe(state.branchId!, _ref);
+    }
+    return success;
   }
 
   /// Lock screen - preserves session info but redirects to PIN entry.
@@ -375,6 +521,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         lockedUser: () => null,
         isLoading: false,
       );
+      if (state.branchId != null) {
+        _ref.read(realtimeSyncServiceProvider).subscribe(state.branchId!, _ref);
+      }
       await _saveSessionLocally();
 
       _logToShift(
@@ -387,7 +536,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: () => 'Invalid PIN',
+        errorMessage: () => 'Invalid PIN. Please try again.',
       );
       return false;
     }
@@ -411,6 +560,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final repository = _ref.read(authRepositoryProvider);
       await repository.logout();
     } catch (_) {}
+
+    _ref.read(realtimeSyncServiceProvider).dispose();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userPrefKey);

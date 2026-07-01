@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -20,6 +21,35 @@ class FloorScreen extends ConsumerStatefulWidget {
 
 class _FloorScreenState extends ConsumerState<FloorScreen> {
   TableModel? _selectedTable;
+  Timer? _refreshTimer;
+
+  void _startRefreshTimer(int seconds) {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(Duration(seconds: seconds), (_) {
+      if (mounted) {
+        final repo = ref.read(tableRepositoryProvider);
+        if (repo.lastFetchFailedWith401) {
+          debugPrint('[FloorScreen] Skipping refresh poll cycle because the last attempt failed with 401.');
+          return;
+        }
+        ref.read(posTablesProvider.notifier).refreshTables();
+        ref.read(ordersProvider.notifier).fetchOrders();
+      }
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final initialSeconds = ref.read(posSettingsProvider).autoRefreshInterval;
+    _startRefreshTimer(initialSeconds);
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   void _selectTableForOrdering(String tableId) {
     ref.read(activeTableIdProvider.notifier).state = tableId;
@@ -38,13 +68,25 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tables = ref.watch(posFilteredTablesProvider);
-    final allTablesAsync = ref.watch(posTablesProvider);
-    final allTables = allTablesAsync.valueOrNull ?? [];
-    final sections = ref.watch(posTableSectionsProvider);
-    final selectedSection = ref.watch(posSelectedSectionProvider);
+    ref.listen<int>(
+      posSettingsProvider.select((s) => s.autoRefreshInterval),
+      (previous, next) {
+        if (next != previous) {
+          _startRefreshTimer(next);
+        }
+      },
+    );
 
+    final tables = ref.watch(liveTableStatusProvider);
+    // Filter by selected section (mirrors posFilteredTablesProvider logic but on enriched tables)
+    final selectedSection = ref.watch(posSelectedSectionProvider);
+    final filteredTables = selectedSection == null
+        ? tables
+        : tables.where((t) => t.sectionName == selectedSection).toList();
+
+    final sections = ref.watch(posTableSectionsProvider);
     // Calculate operational summary stats dynamically
+    final allTables = tables; // liveTableStatusProvider already returns all tables enriched
     final occupiedCount = allTables.where((t) => t.status == POSTableStatus.occupied).length;
     final preparingCount = allTables.where((t) => t.status == POSTableStatus.preparing).length;
     final readyCount = allTables.where((t) => t.status == POSTableStatus.ready).length;
@@ -175,7 +217,7 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
                       // Dining Room Grid (top panel)
                       Expanded(
                         flex: 6,
-                        child: _buildGrid(tables),
+                        child: _buildGrid(filteredTables),
                       ),
                       // Horizontal Divider
                       Container(height: 1.h, color: AppColors.border),
@@ -192,7 +234,7 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
                       // Dining Room Grid (left panel)
                       Expanded(
                         flex: 7,
-                        child: _buildGrid(tables),
+                        child: _buildGrid(filteredTables),
                       ),
                       // Divider line
                       Container(width: 1.w, color: AppColors.border),
@@ -209,7 +251,7 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
     );
   }
 
-  Widget _buildGrid(List<dynamic> tables) {
+  Widget _buildGrid(List<TableModel> tables) {
     final allTablesAsync = ref.watch(posTablesProvider);
 
     if (allTablesAsync.isLoading && (allTablesAsync.valueOrNull ?? []).isEmpty) {
@@ -354,7 +396,7 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
           if (table.status == POSTableStatus.available) ...[
             PrimaryButton(
               onPressed: () {
-                final currentUserName = ref.read(authProvider).user?.name ?? 'Sarah';
+                final currentUserName = ref.read(authProvider).user?.name ?? 'Staff';
                 ref.read(posTablesProvider.notifier).seatTable(table.id, 2, currentUserName);
                 _selectTableForOrdering(table.id);
                 setState(() => _selectedTable = null);
@@ -365,7 +407,7 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
             Gap(12.h),
             SecondaryButton(
               onPressed: () {
-                final currentUserName = ref.read(authProvider).user?.name ?? 'Sarah';
+                final currentUserName = ref.read(authProvider).user?.name ?? 'Staff';
                 ref.read(posTablesProvider.notifier).seatTable(table.id, 2, currentUserName);
                 _selectTableForOrdering(table.id);
                 context.go('/menu');

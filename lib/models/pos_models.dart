@@ -37,6 +37,8 @@ class TableModel {
     this.status = POSTableStatus.available,
     this.guestCount = 0,
     this.waiterName,
+    this.assignedWaiterId,
+    this.assignedWaiterName,
     this.occupiedSince,
     this.billTotal = 0.0,
     this.sectionName,
@@ -49,6 +51,8 @@ class TableModel {
   final POSTableStatus status;
   final int guestCount;
   final String? waiterName;
+  final String? assignedWaiterId;
+  final String? assignedWaiterName;
   final DateTime? occupiedSince;
   final double billTotal;
   final String? sectionName;
@@ -67,6 +71,8 @@ class TableModel {
     POSTableStatus? status,
     int? guestCount,
     String? waiterName,
+    String? assignedWaiterId,
+    String? assignedWaiterName,
     DateTime? occupiedSince,
     double? billTotal,
     String? sectionName,
@@ -79,6 +85,8 @@ class TableModel {
         status: status ?? this.status,
         guestCount: guestCount ?? this.guestCount,
         waiterName: waiterName ?? this.waiterName,
+        assignedWaiterId: assignedWaiterId ?? this.assignedWaiterId,
+        assignedWaiterName: assignedWaiterName ?? this.assignedWaiterName,
         occupiedSince: occupiedSince ?? this.occupiedSince,
         billTotal: billTotal ?? this.billTotal,
         sectionName: sectionName ?? this.sectionName,

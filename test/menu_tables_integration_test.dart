@@ -4,7 +4,16 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:orderlli_pos/core/constants/app_constants.dart';
+import 'package:orderlli_pos/core/repositories/menu_repository.dart';
+import 'package:orderlli_pos/core/repositories/table_repository.dart';
 import 'package:orderlli_pos/core/services/secure_storage_service.dart';
+import 'package:orderlli_pos/core/services/device_fingerprint_service.dart';
+import 'package:orderlli_pos/core/services/dio_client.dart';
+import 'package:orderlli_pos/core/services/menu_service.dart';
+import 'package:orderlli_pos/core/services/table_service.dart';
+import 'package:orderlli_pos/models/models.dart';
+import 'package:orderlli_pos/mock/mock_data.dart';
+import 'package:orderlli_pos/mock/mock_pos_data.dart';
 import 'package:orderlli_pos/providers/providers.dart';
 import 'package:orderlli_pos/screens/menu/menu_screen.dart';
 import 'package:orderlli_pos/screens/floor/floor_screen.dart';
@@ -18,6 +27,66 @@ class FakeSecureStorageService extends SecureStorageService {
       'deviceSessionId': null,
       'userJson': null,
     };
+  }
+}
+
+final _dummySecureStorage = SecureStorageService();
+final _dummyFingerprint = DeviceFingerprintService();
+final _dummyDioClient = DioClient(_dummySecureStorage, _dummyFingerprint);
+
+class MockMenuRepository extends MenuRepository {
+  MockMenuRepository() : super(MenuService(_dummyDioClient));
+
+  @override
+  Future<List<Category>> fetchCategories(String tenantId) async {
+    return MockData.categories;
+  }
+
+  @override
+  Future<List<MenuItem>> fetchMenuItems(String tenantId, String branchId) async {
+    return MockData.menuItems;
+  }
+}
+
+class MockTableRepository extends TableRepository {
+  MockTableRepository() : super(TableService(_dummyDioClient));
+
+  @override
+  Future<List<TableFloor>> fetchFloors() async {
+    return [
+      const TableFloor(
+        id: 'fl-1',
+        tenantId: 'tenant-1',
+        branchId: 'branch-1',
+        name: 'Main Floor',
+        sortOrder: 0,
+      ),
+    ];
+  }
+
+  @override
+  Future<List<TableSection>> fetchSections({String? branchId}) async {
+    return [
+      const TableSection(
+        id: 'sec-1',
+        tenantId: 'tenant-1',
+        branchId: 'branch-1',
+        name: 'Indoor',
+        sortOrder: 0,
+      ),
+      const TableSection(
+        id: 'sec-2',
+        tenantId: 'tenant-1',
+        branchId: 'branch-1',
+        name: 'Terrace',
+        sortOrder: 1,
+      ),
+    ];
+  }
+
+  @override
+  Future<List<TableModel>> fetchTables(String branchId) async {
+    return MockPOSData.tables;
   }
 }
 
@@ -51,6 +120,22 @@ void main() {
         builder: (_, _) => ProviderScope(
           overrides: [
             secureStorageProvider.overrideWithValue(FakeSecureStorageService()),
+            menuRepositoryProvider.overrideWithValue(MockMenuRepository()),
+            authProvider.overrideWith((ref) {
+              final notifier = AuthNotifier(ref);
+              notifier.state = const AuthState(
+                tenantId: 'tenant-1',
+                branchId: 'branch-1',
+                user: PosUser(
+                  id: 'staff-1',
+                  name: 'Staff User',
+                  role: UserRole.cashier,
+                  pin: '1234',
+                  terminalId: 'Main Terminal',
+                ),
+              );
+              return notifier;
+            }),
           ],
           child: const MaterialApp(
             home: MenuScreen(),
@@ -94,6 +179,22 @@ void main() {
         builder: (_, _) => ProviderScope(
           overrides: [
             secureStorageProvider.overrideWithValue(FakeSecureStorageService()),
+            tableRepositoryProvider.overrideWithValue(MockTableRepository()),
+            authProvider.overrideWith((ref) {
+              final notifier = AuthNotifier(ref);
+              notifier.state = const AuthState(
+                tenantId: 'tenant-1',
+                branchId: 'branch-1',
+                user: PosUser(
+                  id: 'staff-1',
+                  name: 'Staff User',
+                  role: UserRole.cashier,
+                  pin: '1234',
+                  terminalId: 'Main Terminal',
+                ),
+              );
+              return notifier;
+            }),
           ],
           child: const MaterialApp(
             home: FloorScreen(),

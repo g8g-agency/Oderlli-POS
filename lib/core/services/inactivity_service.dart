@@ -10,8 +10,16 @@ class InactivityService {
     required this.onTimeout,
   });
 
-  final Duration timeout;
+  Duration timeout;
   final VoidCallback onTimeout;
+
+  void updateTimeout(Duration newTimeout) {
+    if (timeout == newTimeout) return;
+    timeout = newTimeout;
+    if (_timer != null) {
+      _resetTimer();
+    }
+  }
 
   Timer? _timer;
 

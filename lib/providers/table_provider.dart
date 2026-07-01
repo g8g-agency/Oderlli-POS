@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../core/services/table_service.dart';
 import '../core/repositories/table_repository.dart';
+import '../screens/login/employee_login_screen.dart';
 import 'auth_provider.dart';
+import 'orders_provider.dart';
+import 'pos_cart_provider.dart';
 
 // ─── Infrastructure Providers ─────────────────────────────────
 
@@ -16,7 +19,9 @@ final tableRepositoryProvider = Provider<TableRepository>((ref) {
   final service = ref.watch(tableServiceProvider);
   // Recreate repository if auth state changes, effectively clearing the cache on session change
   ref.watch(authProvider);
-  return TableRepository(service);
+  final repo = TableRepository(service);
+  TableRepository.resetCircuitBreaker(ref: ref);
+  return repo;
 });
 
 final _tablesSessionIdsProvider = Provider<({String? tenantId, String? branchId})>((ref) {
@@ -33,7 +38,8 @@ final floorsProvider = FutureProvider<List<TableFloor>>((ref) async {
 
 final sectionsProvider = FutureProvider<List<TableSection>>((ref) async {
   final repo = ref.watch(tableRepositoryProvider);
-  return repo.fetchSections();
+  final authState = ref.watch(authProvider);
+  return repo.fetchSections(branchId: authState.branchId);
 });
 
 // ─── POS Tables State Provider ────────────────────────────────
@@ -68,6 +74,7 @@ class POSTablesNotifier extends AsyncNotifier<List<TableModel>> {
   }
 
   Future<void> refreshTables() async {
+    TableRepository.resetCircuitBreaker(force: true);
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _fetch());
   }
@@ -107,20 +114,38 @@ class POSTablesNotifier extends AsyncNotifier<List<TableModel>> {
     }
   }
 
-  void clearTable(String tableId) {
+  Future<void> clearTable(String tableId) async {
+    // 1. Optimistic update — mark table as available immediately in UI
     final currentList = state.valueOrNull;
     if (currentList != null) {
       state = AsyncValue.data(
-        currentList.map((t) => t.id == tableId
-            ? t.copyWith(
-                status: POSTableStatus.available,
-                guestCount: 0,
-                waiterName: null,
-                occupiedSince: null,
-                billTotal: 0.0,
-              )
-            : t).toList(),
+        currentList.map((t) =>
+          t.id == tableId
+              ? t.copyWith(
+                  status: POSTableStatus.available,
+                  guestCount: 0,
+                  waiterName: null,
+                  occupiedSince: null,
+                  billTotal: 0.0,
+                )
+              : t
+        ).toList(),
       );
+    }
+
+    try {
+      // 2. Evict QR session cache for this table
+      ref.read(cartRepositoryProvider).evictTableSession(tableId);
+
+      // 3. Call backend vacate
+      await ref.read(tableRepositoryProvider).vacateTable(tableId);
+
+      // 4. Re-fetch verified state from backend
+      await refreshTables();
+    } catch (e) {
+      // 5. ROLLBACK — revert optimistic update by re-fetching real state
+      await refreshTables();
+      rethrow;
     }
   }
 }
@@ -205,4 +230,55 @@ final tableSectionsProvider = Provider<List<String>>((ref) {
       .whereType<String>()
       .toSet()
       .toList();
+});
+
+final liveTableStatusProvider = Provider<List<TableModel>>((ref) {
+  final tables = ref.watch(posTablesProvider).valueOrNull ?? [];
+  final orders = ref.watch(ordersProvider);
+  final staffList = ref.watch(staffListProvider).valueOrNull ?? [];
+
+  // Build a lookup: tableId -> most-recent active order
+  final Map<String, Order> activeOrderByTable = {};
+  for (final order in orders) {
+    if (order.status == OrderStatus.served ||
+        order.status == OrderStatus.completed ||
+        order.status == OrderStatus.cancelled) {
+      continue;
+    }
+    final existing = activeOrderByTable[order.tableId];
+    if (existing == null || order.createdAt.isAfter(existing.createdAt)) {
+      activeOrderByTable[order.tableId] = order;
+    }
+  }
+
+  return tables.map((table) {
+    String? resolvedWaiterName;
+    if (table.assignedWaiterId != null) {
+      final waiter = staffList.where((s) => s.id == table.assignedWaiterId).firstOrNull;
+      resolvedWaiterName = waiter?.name;
+    }
+
+    var enrichedTable = table.copyWith(
+      assignedWaiterName: resolvedWaiterName,
+    );
+
+    final order = activeOrderByTable[table.id];
+    if (order == null) return enrichedTable;
+
+    // Derive status from order when it adds more precision than runtimeState
+    POSTableStatus enrichedStatus = table.status;
+    if (order.status != OrderStatus.served &&
+        order.status != OrderStatus.completed &&
+        order.status != OrderStatus.cancelled) {
+      if (table.status == POSTableStatus.available) {
+        enrichedStatus = POSTableStatus.occupied;
+      }
+    }
+
+    return enrichedTable.copyWith(
+      billTotal: order.total,
+      occupiedSince: order.createdAt,
+      status: enrichedStatus,
+    );
+  }).toList();
 });
