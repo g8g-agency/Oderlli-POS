@@ -17,6 +17,7 @@ import '../screens/orders/orders_screen.dart';
 // import '../screens/kitchen/kitchen_screen.dart';
 import '../screens/shifts/shifts_screen.dart';
 import '../screens/settings/settings_screen.dart';
+import '../screens/reviews/reviews_screen.dart';
 import '../screens/menu/menu_screen.dart';
 import '../screens/cart/cart_screen.dart';
 import '../screens/checkout/checkout_shell.dart';
@@ -101,6 +102,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 2. Shift Audit Screen: Manager Only
       if (path.startsWith(AppRoutes.shifts)) {
         if (!RolePermissions.canCloseShift(role)) {
+          return AppRoutes.dashboard;
+        }
+      }
+
+      // 2.5 Reviews Screen: Manager or Admin Only
+      if (path.startsWith(AppRoutes.reviews)) {
+        if (role != UserRole.manager && role != UserRole.admin) {
           return AppRoutes.dashboard;
         }
       }
@@ -196,6 +204,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.settings,
             name: 'settings',
             builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.reviews,
+            name: 'reviews',
+            builder: (context, state) => const ReviewsScreen(),
           ),
           GoRoute(
             path: AppRoutes.cart,

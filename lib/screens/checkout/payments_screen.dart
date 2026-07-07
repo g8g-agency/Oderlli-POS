@@ -34,11 +34,18 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final amountParam = GoRouterState.of(context).uri.queryParameters['amount'];
-      if (amountParam != null) {
-        setState(() {
+      final methodParam = GoRouterState.of(context).uri.queryParameters['method'];
+      
+      setState(() {
+        if (amountParam != null) {
           _cashTendered = amountParam;
-        });
-      }
+        }
+        if (methodParam != null) {
+          if (methodParam == 'cash') _activeTab = 0;
+          else if (methodParam == 'card') _activeTab = 1;
+          else if (methodParam == 'upi') _activeTab = 2;
+        }
+      });
     });
   }
 

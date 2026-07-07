@@ -149,14 +149,18 @@ class _OrderRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statusColor = _statusColor(order.status);
     final isCompact = context.screenWidth < 850;
+    
+    final hasPaymentIntent = order.customerPaymentIntent != null;
+    final borderColor = hasPaymentIntent ? AppColors.warning : AppColors.border;
+    final paymentIntentLabel = order.customerPaymentIntent == 'upi' ? 'UPI PENDING' : 'CASH REQ';
 
     if (isCompact) {
       return Container(
         padding: EdgeInsets.all(16.r),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: hasPaymentIntent ? AppColors.warning.withValues(alpha: 0.05) : AppColors.surface,
           borderRadius: BorderRadius.circular(14.r),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: borderColor, width: hasPaymentIntent ? 2 : 1),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,7 +209,16 @@ class _OrderRow extends ConsumerWidget {
                         order.createdAt.minutesAgoLabel,
                         style: AppTextStyles.bodySmall,
                       ),
-                      _StatusPill(status: order.status, color: statusColor),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (hasPaymentIntent) ...[
+                            _PaymentBadge(label: paymentIntentLabel),
+                            Gap(8.w),
+                          ],
+                          _StatusPill(status: order.status, color: statusColor),
+                        ],
+                      ),
                     ],
                   ),
                 ],
@@ -219,9 +232,9 @@ class _OrderRow extends ConsumerWidget {
     return Container(
       padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: hasPaymentIntent ? AppColors.warning.withValues(alpha: 0.05) : AppColors.surface,
         borderRadius: BorderRadius.circular(14.r),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: borderColor, width: hasPaymentIntent ? 2 : 1),
       ),
       child: Row(
         children: [
@@ -266,8 +279,11 @@ class _OrderRow extends ConsumerWidget {
           // Total
           Text(order.total.asCurrency, style: AppTextStyles.priceTag),
           Gap(16.w),
-          // Status badge — passive display only, no interaction
-          // Cashiers can SEE KDS status but cannot change it from this screen.
+          // Status badge
+          if (hasPaymentIntent) ...[
+            _PaymentBadge(label: paymentIntentLabel),
+            Gap(8.w),
+          ],
           _StatusPill(status: order.status, color: statusColor),
         ],
       ),
@@ -304,6 +320,29 @@ class _StatusPill extends StatelessWidget {
         status.label,
         style: AppTextStyles.labelSmall.copyWith(
           color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentBadge extends StatelessWidget {
+  const _PaymentBadge({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: AppColors.warning,
+        borderRadius: BorderRadius.circular(100.r),
+      ),
+      child: Text(
+        label,
+        style: AppTextStyles.labelSmall.copyWith(
+          color: Colors.white,
           fontWeight: FontWeight.w700,
         ),
       ),

@@ -157,6 +157,9 @@ class _Sidebar extends ConsumerWidget {
       if (item.route == AppRoutes.shifts) {
         return RolePermissions.canCloseShift(role);
       }
+      if (item.route == AppRoutes.reviews) {
+        return role == UserRole.manager || role == UserRole.admin;
+      }
       // if (item.route == AppRoutes.kitchen) {
       //   return role == UserRole.manager || role == UserRole.server;
       // }
@@ -267,6 +270,12 @@ class _Sidebar extends ConsumerWidget {
       icon: Icons.vpn_key_outlined,
       activeIcon: Icons.vpn_key,
       route: AppRoutes.shifts,
+    ),
+    _NavItem(
+      label: 'Reviews',
+      icon: Icons.star_outline,
+      activeIcon: Icons.star,
+      route: AppRoutes.reviews,
     ),
   ];
 }

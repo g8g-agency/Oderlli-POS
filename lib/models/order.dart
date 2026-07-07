@@ -209,6 +209,7 @@ class Order {
     int? taxTotalMinor,
     int? discountTotalMinor,
     int? grandTotalMinor,
+    String? customerPaymentIntent,
   }) =>
       Order(
         id: id ?? this.id,
@@ -229,6 +230,7 @@ class Order {
         taxTotalMinor: taxTotalMinor ?? this.taxTotalMinor,
         discountTotalMinor: discountTotalMinor ?? this.discountTotalMinor,
         grandTotalMinor: grandTotalMinor ?? this.grandTotalMinor,
+        customerPaymentIntent: customerPaymentIntent ?? this.customerPaymentIntent,
       );
 
   factory Order.fromJson(Map<String, dynamic> json, [List<OrderItem> items = const [], int tableNum = 0]) {
@@ -296,6 +298,7 @@ class OrderSummary {
   final String tableId;
   final String? orderNotes;
   final int grandTotalMinor;
+  final String? customerPaymentIntent;
 
   const OrderSummary({
     required this.id,
@@ -305,6 +308,7 @@ class OrderSummary {
     required this.tableId,
     this.orderNotes,
     this.grandTotalMinor = 0,
+    this.customerPaymentIntent,
   });
 
   double get total => grandTotalMinor / 100.0;
@@ -318,6 +322,7 @@ class OrderSummary {
       tableId: (json['table_id'] ?? '') as String,
       orderNotes: json['order_notes'] as String?,
       grandTotalMinor: (json['grand_total_minor'] as num?)?.toInt() ?? 0,
+      customerPaymentIntent: json['customer_payment_intent'] as String?,
     );
   }
 }
@@ -355,6 +360,7 @@ class OrderDetail {
   final int taxTotalMinor;
   final int discountTotalMinor;
   final int grandTotalMinor;
+  final String? customerPaymentIntent;
 
   const OrderDetail({
     required this.id,
@@ -441,6 +447,7 @@ class OrderDetail {
       taxTotalMinor: (json['tax_total_minor'] as num?)?.toInt() ?? 0,
       discountTotalMinor: (json['discount_total_minor'] as num?)?.toInt() ?? 0,
       grandTotalMinor: (json['grand_total_minor'] as num?)?.toInt() ?? 0,
+      customerPaymentIntent: json['customer_payment_intent'] as String?,
     );
   }
 }

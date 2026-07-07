@@ -13,6 +13,7 @@ abstract final class AppRoutes {
   static const String kitchen = '/kitchen';
   static const String shifts = '/shifts';
   static const String settings = '/settings';
+  static const String reviews = '/reviews';
   static const String menu = '/menu';
   static const String posMenu = '/pos/menu';
   static const String tableSelection = '/table-selection';
