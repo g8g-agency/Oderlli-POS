@@ -8,7 +8,6 @@ import '../core/services/inactivity_service.dart';
 final inactivityServiceProvider = Provider<InactivityService>((ref) {
   final service = InactivityService(
     timeout: const Duration(minutes: 5),
-    onTimeout: () {}, // overwritten by InactivityScope
   );
   ref.onDispose(service.dispose);
   return service;

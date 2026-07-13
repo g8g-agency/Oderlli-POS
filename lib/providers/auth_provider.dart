@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +12,7 @@ import '../core/services/realtime_sync_service.dart';
 import '../core/repositories/auth_repository.dart';
 import '../models/models.dart';
 import 'shift_provider.dart';
+import 'inactivity_provider.dart';
 
 /// State representation of the active POS session.
 class AuthState {
@@ -174,6 +176,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {}
 
     _ref.read(realtimeSyncServiceProvider).dispose();
+    _ref.read(inactivityServiceProvider).pause();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userPrefKey);
@@ -326,16 +329,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> fetchBranches() async {
     state = state.copyWith(isLoading: true, errorMessage: () => null);
     try {
+      debugPrint('[fetchBranches] State transitioning to Loading...');
       final repository = _ref.read(authRepositoryProvider);
       final branches = await repository.fetchBranches();
       
+      debugPrint('[fetchBranches] API returned ${branches.length} branches.');
+      
       // Filter branches strictly by: branch.tenantId == session.tenantId
-      final filtered = branches.where((b) => b.tenantId == state.tenantId).toList();
+      // Or include them if tenantId is null (which happens when fetched from /current)
+      final filtered = branches.where((b) {
+        final matches = b.tenantId == state.tenantId || b.tenantId == null;
+        debugPrint('[fetchBranches] Branch ${b.id} (${b.name}): tenantId=${b.tenantId}, state.tenantId=${state.tenantId} -> include? $matches');
+        return matches;
+      }).toList();
+      
       state = state.copyWith(
         availableBranches: filtered,
         isLoading: false,
       );
-    } catch (e) {
+      debugPrint('[fetchBranches] State transitioning to Data with ${filtered.length} branches.');
+    } catch (e, st) {
+      debugPrint('[fetchBranches] Exception: $e\n$st');
       String message = 'Failed to load branches';
       if (e is DioException) {
         final data = e.response?.data;

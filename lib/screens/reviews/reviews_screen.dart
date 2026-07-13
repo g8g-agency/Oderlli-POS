@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../theme/theme.dart';
 import '../../providers/auth_provider.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:intl/intl.dart';
-import '../../core/utils/environment.dart';
 
 class ReviewsScreen extends ConsumerStatefulWidget {
   const ReviewsScreen({super.key});
@@ -28,18 +25,12 @@ class _ReviewsScreenState extends ConsumerState<ReviewsScreen> {
     setState(() => _isLoading = true);
     try {
       final authState = ref.read(authProvider);
-      final url = Uri.parse('${Environment.apiUrl}/reviews?branchId=${authState.branchId}');
+      final dio = ref.read(dioClientProvider).dio;
       
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${authState.accessToken}',
-        },
-      );
+      final response = await dio.get('/reviews', queryParameters: {'branchId': authState.branchId});
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final data = response.data;
         setState(() {
           _reviews = data['data'] ?? [];
         });

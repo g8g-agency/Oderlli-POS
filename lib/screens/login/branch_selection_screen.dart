@@ -22,6 +22,7 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
     super.initState();
     // Refresh branches list on load
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      debugPrint('[BranchSelectionScreen] initState: triggering fetchBranches()');
       ref.read(authProvider.notifier).fetchBranches();
     });
   }
@@ -51,6 +52,7 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
     const brandRed = Color(0xFFBA0013);
     final authState = ref.watch(authProvider);
     final branches = authState.availableBranches;
+    debugPrint('[BranchSelectionScreen] build: isLoading=${authState.isLoading}, branches=${branches.length}, error=${authState.errorMessage}');
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF191C1D) : const Color(0xFFF8F9FA),
@@ -155,65 +157,76 @@ class _BranchSelectionScreenState extends ConsumerState<BranchSelectionScreen> {
 
                       // Branch List Grid/List
                       Expanded(
-                        child: authState.errorMessage != null
-                            ? SingleChildScrollView(
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.error_outline_rounded,
-                                        color: brandRed,
-                                        size: 48,
-                                      ),
-                                      Gap(16.h),
-                                      Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 16.w),
-                                        child: Text(
-                                          authState.errorMessage!,
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 14.sp,
-                                            color: isDark ? Colors.white70 : Colors.black87,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                      Gap(24.h),
-                                      ElevatedButton.icon(
-                                        onPressed: () {
-                                          ref.read(authProvider.notifier).fetchBranches();
-                                        },
-                                        icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-                                        label: Text(
-                                          'Try Again',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: brandRed,
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 24.w,
-                                            vertical: 12.h,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(8.r),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                        child: authState.isLoading
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(brandRed),
                                 ),
                               )
-                            : branches.isEmpty
-                                ? const Center(
-                                    child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(brandRed),
+                            : authState.errorMessage != null
+                                ? SingleChildScrollView(
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.error_outline_rounded,
+                                            color: brandRed,
+                                            size: 48,
+                                          ),
+                                          Gap(16.h),
+                                          Padding(
+                                            padding: EdgeInsets.symmetric(horizontal: 16.w),
+                                            child: Text(
+                                              authState.errorMessage!,
+                                              style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 14.sp,
+                                                color: isDark ? Colors.white70 : Colors.black87,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                          Gap(24.h),
+                                          ElevatedButton.icon(
+                                            onPressed: () {
+                                              debugPrint('[BranchSelectionScreen] Retry clicked');
+                                              ref.read(authProvider.notifier).fetchBranches();
+                                            },
+                                            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                                            label: Text(
+                                              'Try Again',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: brandRed,
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 24.w,
+                                                vertical: 12.h,
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8.r),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   )
-                                : GridView.builder(
+                                : branches.isEmpty
+                                    ? Center(
+                                        child: Text(
+                                          'No branches found for this organization.',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            color: isDark ? Colors.white70 : Colors.black54,
+                                            fontSize: 16.sp,
+                                          ),
+                                        ),
+                                      )
+                                    : GridView.builder(
                                     shrinkWrap: true,
                                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: MediaQuery.sizeOf(context).width > 600 ? 2 : 1,

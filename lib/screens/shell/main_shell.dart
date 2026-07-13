@@ -158,7 +158,7 @@ class _Sidebar extends ConsumerWidget {
         return RolePermissions.canCloseShift(role);
       }
       if (item.route == AppRoutes.reviews) {
-        return role == UserRole.manager || role == UserRole.admin;
+        return role == UserRole.manager;
       }
       // if (item.route == AppRoutes.kitchen) {
       //   return role == UserRole.manager || role == UserRole.server;

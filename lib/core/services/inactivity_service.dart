@@ -7,11 +7,11 @@ import 'package:flutter/foundation.dart';
 class InactivityService {
   InactivityService({
     this.timeout = const Duration(minutes: 5),
-    required this.onTimeout,
+    this.onTimeout,
   });
 
   Duration timeout;
-  final VoidCallback onTimeout;
+  VoidCallback? onTimeout;
 
   void updateTimeout(Duration newTimeout) {
     if (timeout == newTimeout) return;
@@ -29,7 +29,9 @@ class InactivityService {
 
   void _resetTimer() {
     _timer?.cancel();
-    _timer = Timer(timeout, onTimeout);
+    if (onTimeout != null) {
+      _timer = Timer(timeout, onTimeout!);
+    }
   }
 
   void pause() {

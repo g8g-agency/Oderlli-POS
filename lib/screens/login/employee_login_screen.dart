@@ -12,6 +12,7 @@ import '../../widgets/widgets.dart';
 import '../../core/extensions/extensions.dart';
 import '../../models/models.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/inactivity_provider.dart';
 
 /// Loads branch-scoped staff. Only re-fetches when tenant/branch changes —
 /// not on every auth tick (isLoading, lock state, etc.).
@@ -203,6 +204,7 @@ class _EmployeeLoginScreenState extends ConsumerState<EmployeeLoginScreen>
       }
 
       if (success) {
+        ref.read(inactivityServiceProvider).resetTimer();
         if (mounted) {
           setState(() => _feedbackText = 'Welcome back, ${user.name}! ✓');
           await Future.delayed(const Duration(milliseconds: 380));

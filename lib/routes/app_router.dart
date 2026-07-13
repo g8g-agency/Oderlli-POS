@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../models/models.dart';
 import '../core/utils/role_permissions.dart';
 import '../theme/theme.dart';
+import 'inactivity_route_observer.dart';
 
 import '../screens/splash/splash_screen.dart';
 import '../screens/login/login_screen.dart';
@@ -48,6 +49,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: true,
     refreshListenable: refreshListenable,
+    observers: [InactivityRouteObserver(ref)],
     redirect: (context, state) {
       final authState = ref.read(authProvider);
       final isOrgAuthenticated = authState.isOrgAuthenticated;
@@ -106,9 +108,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      // 2.5 Reviews Screen: Manager or Admin Only
+      // 2.5 Reviews Screen: Manager Only
       if (path.startsWith(AppRoutes.reviews)) {
-        if (role != UserRole.manager && role != UserRole.admin) {
+        if (role != UserRole.manager) {
           return AppRoutes.dashboard;
         }
       }

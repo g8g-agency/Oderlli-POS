@@ -13,6 +13,7 @@ class PosTable {
   final bool isActive;
   final int versionNum;
   final String? runtimeState;
+  final String? customerPaymentIntent;
   final int? guestCount;
 
   const PosTable({
@@ -30,6 +31,7 @@ class PosTable {
     required this.isActive,
     required this.versionNum,
     this.runtimeState,
+    this.customerPaymentIntent,
     this.guestCount,
   });
 
@@ -48,6 +50,7 @@ class PosTable {
         isActive: (json['is_active'] ?? true) as bool,
         versionNum: (json['version_num'] ?? 0) as int,
         runtimeState: json['runtime_state'] as String?,
+        customerPaymentIntent: json['customer_payment_intent'] as String?,
         guestCount: json['guest_count'] as int?,
       );
 
@@ -66,6 +69,7 @@ class PosTable {
         'is_active': isActive,
         'version_num': versionNum,
         'runtime_state': runtimeState,
+        'customer_payment_intent': customerPaymentIntent,
         'guest_count': guestCount,
       };
 }

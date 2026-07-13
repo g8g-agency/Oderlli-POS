@@ -43,6 +43,7 @@ class TableModel {
     this.billTotal = 0.0,
     this.sectionName,
     this.floorName,
+    this.customerPaymentIntent,
   });
 
   final String id;
@@ -57,6 +58,7 @@ class TableModel {
   final double billTotal;
   final String? sectionName;
   final String? floorName;
+  final String? customerPaymentIntent;
 
   /// Returns the elapsed minutes since the table was occupied.
   int get elapsedMinutes {
@@ -77,6 +79,7 @@ class TableModel {
     double? billTotal,
     String? sectionName,
     String? floorName,
+    String? customerPaymentIntent,
   }) =>
       TableModel(
         id: id ?? this.id,
@@ -91,6 +94,7 @@ class TableModel {
         billTotal: billTotal ?? this.billTotal,
         sectionName: sectionName ?? this.sectionName,
         floorName: floorName ?? this.floorName,
+        customerPaymentIntent: customerPaymentIntent ?? this.customerPaymentIntent,
       );
 }
 

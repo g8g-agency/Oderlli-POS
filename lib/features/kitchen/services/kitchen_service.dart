@@ -25,8 +25,8 @@ class KitchenService {
       '/api/v1/kitchen/tickets',
       queryParameters: {
         'branchId': branchId,
-        'status': status,
-        'stationId': stationId,
+        if (status != null) 'status': status,
+        if (stationId != null) 'stationId': stationId,
       },
     );
     _assertSuccess(response);

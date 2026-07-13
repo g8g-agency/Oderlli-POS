@@ -7,6 +7,7 @@ import 'auth_provider.dart';
 import 'orders_provider.dart';
 import 'table_provider.dart';
 import 'shift_provider.dart';
+import 'inactivity_provider.dart';
 
 /// Tracks the active table being checked out.
 final activeTableIdProvider = StateProvider<String?>((ref) => null);
@@ -395,6 +396,8 @@ class ActiveBillNotifier extends StateNotifier<ActiveBillState?> {
         isSubmittingPayment: false,
         paymentError: () => null,
       );
+
+      _ref.read(inactivityServiceProvider).resetTimer();
 
       // Perform local side effects on success
       if (method == 'Cash') {

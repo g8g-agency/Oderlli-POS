@@ -11,6 +11,7 @@ import '../../providers/providers.dart';
 import '../../widgets/widgets.dart';
 import '../../constants/pos_constants.dart';
 import '../../core/extensions/extensions.dart';
+import '../../providers/inactivity_provider.dart';
 
 class FloorScreen extends ConsumerStatefulWidget {
   const FloorScreen({super.key});
@@ -140,6 +141,7 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
                   tooltip: 'Refresh Floor Plan',
                   onPressed: () {
                     ref.read(posTablesProvider.notifier).refreshTables();
+                    ref.read(inactivityServiceProvider).resetTimer();
                   },
                 ),
                 Gap(16.w),

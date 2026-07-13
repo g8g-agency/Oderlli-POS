@@ -173,10 +173,28 @@ class POSTableCard extends StatelessWidget {
                             ),
                     ),
                   ),
-                  // Footer: Operational Status Chip
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: OperationalStatusChip(status: opStatus),
+                  // Footer: Operational Status Chip & Payment Intent
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      OperationalStatusChip(status: opStatus),
+                      if (table.customerPaymentIntent != null)
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                          decoration: BoxDecoration(
+                            color: AppColors.statusReady.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6.r),
+                            border: Border.all(color: AppColors.statusReady.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            table.customerPaymentIntent!.toUpperCase(),
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.statusReady,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),

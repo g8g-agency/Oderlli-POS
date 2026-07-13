@@ -159,6 +159,7 @@ class Order {
     this.taxTotalMinor = 0,
     this.discountTotalMinor = 0,
     this.grandTotalMinor = 0,
+    this.customerPaymentIntent,
   });
 
   final String id;
@@ -181,6 +182,7 @@ class Order {
   final int taxTotalMinor;
   final int discountTotalMinor;
   final int grandTotalMinor;
+  final String? customerPaymentIntent;
 
   // ── Computed totals (double getters for backward compatibility) ────────────
   double get subtotal => subtotalMinor > 0 ? subtotalMinor / 100.0 : items.fold(0.0, (sum, i) => sum + i.subtotal);
@@ -256,6 +258,7 @@ class Order {
       taxTotalMinor: (json['tax_total_minor'] as num?)?.toInt() ?? 0,
       discountTotalMinor: (json['discount_total_minor'] as num?)?.toInt() ?? 0,
       grandTotalMinor: (json['grand_total_minor'] as num?)?.toInt() ?? 0,
+      customerPaymentIntent: json['customer_payment_intent'] as String?,
     );
   }
 
@@ -276,6 +279,7 @@ class Order {
         'tax_total_minor': taxTotalMinor,
         'discount_total_minor': discountTotalMinor,
         'grand_total_minor': grandTotalMinor,
+        'customer_payment_intent': customerPaymentIntent,
       };
 
   @override
@@ -393,6 +397,7 @@ class OrderDetail {
     this.taxTotalMinor = 0,
     this.discountTotalMinor = 0,
     this.grandTotalMinor = 0,
+    this.customerPaymentIntent,
   });
 
   double get subtotal => subtotalMinor / 100.0;

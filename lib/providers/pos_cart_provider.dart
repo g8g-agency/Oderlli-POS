@@ -9,6 +9,7 @@ import '../core/repositories/cart_repository.dart';
 import '../models/models.dart';
 import 'auth_provider.dart';
 import 'menu_provider.dart';
+import 'inactivity_provider.dart';
 
 /// State provider for selected table in the cart screen.
 final cartSelectedTableProvider = StateProvider<String?>((ref) => null);
@@ -187,6 +188,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
   /// Bumps expectedCartRevision and loads latest state
   Future<void> refreshCart() async {
     await loadCart();
+    ref?.read(inactivityServiceProvider).resetTimer();
   }
 
   /// Frontend validator check for modifier groups
@@ -248,6 +250,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         );
       }
       _updateStateFromCart(updatedCart);
+      ref?.read(inactivityServiceProvider).resetTimer();
     } on StaleCartRevisionException {
       // Recovery step: reload the cart and throw conflict message
       await refreshCart();
@@ -297,6 +300,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         );
       }
       _updateStateFromCart(updatedCart);
+      ref?.read(inactivityServiceProvider).resetTimer();
     } on StaleCartRevisionException {
       await refreshCart();
       state = state.copyWith(
@@ -330,6 +334,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         expectedCartRevision: state.backendCartVersionNum,
       );
       _updateStateFromCart(updatedCart);
+      ref?.read(inactivityServiceProvider).resetTimer();
     } on StaleCartRevisionException {
       await refreshCart();
       state = state.copyWith(
@@ -393,6 +398,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
       );
 
       _updateStateFromCart(updatedCart);
+      ref?.read(inactivityServiceProvider).resetTimer();
     } on StaleCartRevisionException {
       await refreshCart();
       state = state.copyWith(
@@ -417,7 +423,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
     if (state.backendCartId == null) {
       throw Exception('No active cart to check out.');
     }
-    return orderService.checkout(
+    final order = await orderService.checkout(
       staffToken: staffToken,
       mutationId: const Uuid().v4(),
       idempotencyKey: const Uuid().v4(),
@@ -428,6 +434,8 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         'tax_percent': state.taxPercent,
       },
     );
+    ref?.read(inactivityServiceProvider).resetTimer();
+    return order;
   }
 
   /// Clear the cart completely (locally / session reset)

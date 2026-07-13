@@ -128,6 +128,7 @@ class TableRepository {
             billTotal: 0.0,
             sectionName: sectionName,
             floorName: floorName,
+            customerPaymentIntent: t.customerPaymentIntent,
           ),
         );
       }

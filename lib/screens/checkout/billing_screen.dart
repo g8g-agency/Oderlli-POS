@@ -11,6 +11,7 @@ import '../../providers/providers.dart';
 import '../../models/models.dart';
 import '../../core/services/print_service.dart';
 import '../../core/extensions/extensions.dart';
+import '../../providers/inactivity_provider.dart';
 
 class BillingScreen extends ConsumerWidget {
   const BillingScreen({super.key});
@@ -224,6 +225,7 @@ class BillingScreen extends ConsumerWidget {
 
                           try {
                             await ref.read(printServiceProvider).printReceipt(request);
+                            ref.read(inactivityServiceProvider).resetTimer();
                             ref.read(activeTableIdProvider.notifier).state = null;
                             if (!context.mounted) return;
                             context.showSuccessSnack('Session settled! Receipt printed.');

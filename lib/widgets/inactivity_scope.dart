@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/services/inactivity_service.dart';
 import '../providers/providers.dart';
+import '../providers/inactivity_provider.dart';
 import '../routes/app_router.dart';
 import '../routes/app_routes.dart';
 
@@ -22,18 +24,33 @@ class _InactivityScopeState extends ConsumerState<InactivityScope>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    _service = ref.read(inactivityServiceProvider);
+    
+    // Set up the scope-specific timeout handler
+    _service.onTimeout = _handleTimeout;
+    
+    // Read the initial timeout
     final initialMinutes = ref.read(posSettingsProvider).inactivityTimeout;
-    _service = InactivityService(
-      timeout: Duration(minutes: initialMinutes),
-      onTimeout: _handleTimeout,
-    );
+    _service.updateTimeout(Duration(minutes: initialMinutes));
+    
     _service.start();
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+  }
+
+  bool _handleKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      _service.resetTimer();
+    }
+    return false; // Do not consume the event, let it propagate normally.
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _service.dispose();
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    // InactivityScope no longer disposes the service; the Provider does.
+    // We just remove the callback.
+    _service.onTimeout = null;
     super.dispose();
   }
 
