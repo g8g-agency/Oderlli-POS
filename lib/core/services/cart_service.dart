@@ -146,6 +146,7 @@ class CartService {
     final rawCart = responseData['cart'] as Map<String, dynamic>;
     final rawItems = (responseData['items'] as List<dynamic>?) ?? [];
     final rawModifiers = (responseData['modifiers'] as List<dynamic>?) ?? [];
+    final rawTotals = (responseData['totals'] as Map<String, dynamic>?);
 
     final modifiersList = rawModifiers
         .map((e) => CartModifier.fromJson(e as Map<String, dynamic>))
@@ -158,7 +159,7 @@ class CartService {
       return CartItem.fromJson(itemJson, itemModifiers);
     }).toList();
 
-    return Cart.fromJson(rawCart, itemsList);
+    return Cart.fromJson(rawCart, itemsList, rawTotals);
   }
 
   void _assertSuccess(Response<dynamic> response) {

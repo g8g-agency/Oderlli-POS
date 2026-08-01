@@ -286,9 +286,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             // Financial summary calculations
             if (cartState.items.isNotEmpty) ...[
               FinancialSummary(
-                subtotal: cartState.subtotal,
-                taxPercent: cartState.taxPercent,
-                discountPercent: cartState.discountPercent,
+                subtotal: cartState.subtotalAmount,
+                taxAmount: cartState.taxAmount,
+                discountAmount: cartState.discountAmount,
+                total: cartState.total,
               ),
               Gap(24.h),
             ],
@@ -525,7 +526,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      onPressed: () => ref.read(posCartProvider.notifier).removeItem(item.menuItem),
+                      onPressed: () => ref.read(posCartProvider.notifier).removeItem(
+                        item.menuItem,
+                        backendId: item.backendId,
+                        selectedModifiers: item.selectedModifiers,
+                      ),
                       icon: Icon(Icons.remove, size: 18.sp, color: AppColors.textPrimary),
                       style: IconButton.styleFrom(
                         minimumSize: Size(48.w, 48.h),
@@ -542,7 +547,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => ref.read(posCartProvider.notifier).addItem(item.menuItem),
+                      onPressed: () => ref.read(posCartProvider.notifier).addItem(
+                        item.menuItem,
+                        selectedModifiers: item.selectedModifiers,
+                      ),
                       icon: Icon(Icons.add, size: 18.sp, color: AppColors.textPrimary),
                       style: IconButton.styleFrom(
                         minimumSize: Size(48.w, 48.h),
@@ -559,7 +567,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 onPressed: () {
                   // Simulate deleting items by subtracting qty
                   for (int i = 0; i < item.qty; i++) {
-                    ref.read(posCartProvider.notifier).removeItem(item.menuItem);
+                    ref.read(posCartProvider.notifier).removeItem(
+                      item.menuItem,
+                      backendId: item.backendId,
+                      selectedModifiers: item.selectedModifiers,
+                    );
                   }
                 },
                 icon: const Icon(Icons.delete_outline, color: AppColors.loss),

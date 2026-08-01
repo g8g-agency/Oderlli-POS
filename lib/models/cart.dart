@@ -16,6 +16,10 @@ class Cart {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<CartItem> items;
+  final int subtotalMinor;
+  final int discountMinor;
+  final int totalTaxMinor;
+  final int grandTotalMinor;
 
   const Cart({
     required this.id,
@@ -33,6 +37,10 @@ class Cart {
     required this.createdAt,
     required this.updatedAt,
     this.items = const [],
+    this.subtotalMinor = 0,
+    this.discountMinor = 0,
+    this.totalTaxMinor = 0,
+    this.grandTotalMinor = 0,
   });
 
   factory Cart.empty() => Cart(
@@ -67,6 +75,10 @@ class Cart {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<CartItem>? items,
+    int? subtotalMinor,
+    int? discountMinor,
+    int? totalTaxMinor,
+    int? grandTotalMinor,
   }) =>
       Cart(
         id: id ?? this.id,
@@ -84,9 +96,13 @@ class Cart {
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
         items: items ?? this.items,
+        subtotalMinor: subtotalMinor ?? this.subtotalMinor,
+        discountMinor: discountMinor ?? this.discountMinor,
+        totalTaxMinor: totalTaxMinor ?? this.totalTaxMinor,
+        grandTotalMinor: grandTotalMinor ?? this.grandTotalMinor,
       );
 
-  factory Cart.fromJson(Map<String, dynamic> json, [List<CartItem> cartItems = const []]) => Cart(
+  factory Cart.fromJson(Map<String, dynamic> json, [List<CartItem> cartItems = const [], Map<String, dynamic>? totals]) => Cart(
         id: (json['id'] ?? '') as String,
         tenantId: (json['tenant_id'] ?? '') as String,
         branchId: (json['branch_id'] ?? '') as String,
@@ -102,6 +118,10 @@ class Cart {
         createdAt: DateTime.parse((json['created_at'] ?? DateTime.now().toIso8601String()) as String),
         updatedAt: DateTime.parse((json['updated_at'] ?? DateTime.now().toIso8601String()) as String),
         items: cartItems,
+        subtotalMinor: (totals?['subtotal_minor'] ?? 0) as int,
+        discountMinor: (totals?['discount_minor'] ?? 0) as int,
+        totalTaxMinor: (totals?['total_tax_minor'] ?? 0) as int,
+        grandTotalMinor: (totals?['grand_total_minor'] ?? 0) as int,
       );
 
   Map<String, dynamic> toJson() => {

@@ -17,4 +17,5 @@ export 'manager_override_dialog.dart';
 export 'interaction_listener.dart';
 export 'inactivity_scope.dart';
 export 'session_expired_dialog.dart';
+export 'modifier_selection_dialog.dart';
 

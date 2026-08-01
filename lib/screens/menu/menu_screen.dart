@@ -15,19 +15,19 @@ import '../../routes/app_routes.dart';
 
 /// ─── Light POS Design Palette Colors ─────────────────────────────────────────
 abstract final class LightPOSColors {
-  static const Color primary = Color(0xFFFF7A00);
-  static const Color primaryLight = Color(0xFFFFA352);
-  static const Color background = Color(0xFFF6F7F9);
-  static const Color sidebarBg = Color(0xFFFFFFFF);
-  static const Color cardBg = Color(0xFFFFFFFF);
-  static const Color border = Color(0xFFE5E7EB);
-  static const Color textPrimary = Color(0xFF111827);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color success = Color(0xFF22C55E);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color danger = Color(0xFFEF4444);
+  static const Color primary = AppColors.primary;
+  static const Color primaryLight = AppColors.primaryLight;
+  static const Color background = AppColors.background;
+  static const Color sidebarBg = AppColors.sidebarBg;
+  static const Color cardBg = AppColors.surface;
+  static const Color border = AppColors.border;
+  static const Color textPrimary = AppColors.textPrimary;
+  static const Color textSecondary = AppColors.textSecondary;
+  static const Color success = AppColors.success;
+  static const Color warning = AppColors.warning;
+  static const Color danger = AppColors.error;
   
-  static const Color shadowColor = Color(0x0A000000);
+  static const Color shadowColor = AppColors.shadowDeep;
 
   static const List<BoxShadow> softShadow = [
     BoxShadow(
@@ -57,64 +57,7 @@ abstract final class LightPOSColors {
 }
 
 /// ─── Light POS Typography System ─────────────────────────────────────────────
-abstract final class LightPOSTypography {
-  static TextStyle get headlineLarge => GoogleFonts.inter(
-        fontSize: 26.sp,
-        fontWeight: FontWeight.w800,
-        color: LightPOSColors.textPrimary,
-        letterSpacing: -0.5,
-      );
-
-  static TextStyle get headlineMedium => GoogleFonts.inter(
-        fontSize: 18.sp,
-        fontWeight: FontWeight.w700,
-        color: LightPOSColors.textPrimary,
-        letterSpacing: -0.2,
-      );
-
-  static TextStyle get titleLarge => GoogleFonts.inter(
-        fontSize: 16.sp,
-        fontWeight: FontWeight.w700,
-        color: LightPOSColors.textPrimary,
-      );
-
-  static TextStyle get titleMedium => GoogleFonts.inter(
-        fontSize: 14.sp,
-        fontWeight: FontWeight.w600,
-        color: LightPOSColors.textPrimary,
-      );
-
-  static TextStyle get bodyMedium => GoogleFonts.inter(
-        fontSize: 13.sp,
-        fontWeight: FontWeight.w400,
-        color: LightPOSColors.textPrimary,
-      );
-
-  static TextStyle get bodySmall => GoogleFonts.inter(
-        fontSize: 11.sp,
-        fontWeight: FontWeight.w400,
-        color: LightPOSColors.textSecondary,
-      );
-
-  static TextStyle get labelLarge => GoogleFonts.inter(
-        fontSize: 13.sp,
-        fontWeight: FontWeight.w600,
-        color: LightPOSColors.textPrimary,
-      );
-
-  static TextStyle get labelMedium => GoogleFonts.inter(
-        fontSize: 11.sp,
-        fontWeight: FontWeight.w500,
-        color: LightPOSColors.textSecondary,
-      );
-
-  static TextStyle get labelSmall => GoogleFonts.inter(
-        fontSize: 9.sp,
-        fontWeight: FontWeight.w600,
-        color: LightPOSColors.textSecondary,
-        letterSpacing: 0.5,
-      );
-}
+typedef LightPOSTypography = AppTextStyles;
 
 /// ─── New Order Screen ────────────────────────────────────────────────────────
 ///
@@ -157,6 +100,12 @@ class MenuScreen extends ConsumerWidget {
         tableId != null && PosConstants.isCounterTable(tableId);
 
     final isVertical = context.isVerticalLayout;
+
+    ref.listen<POSCartState>(posCartProvider, (previous, next) {
+      if (next.errorMessage != null && next.errorMessage != previous?.errorMessage) {
+        context.showErrorSnack(next.errorMessage!);
+      }
+    });
 
     // Center grid contents
     final menuGridContent = Container(
@@ -264,7 +213,16 @@ class MenuScreen extends ConsumerWidget {
                         return MenuItemCard(
                           item: item,
                           qtyInCart: qtyInCart,
-                          onAdd: () => ref.read(posCartProvider.notifier).addItem(item),
+                          onAdd: () {
+                            if (item.modifierGroups.isNotEmpty) {
+                              showDialog(
+                                context: context,
+                                builder: (_) => ModifierSelectionDialog(item: item),
+                              );
+                            } else {
+                              ref.read(posCartProvider.notifier).addItem(item);
+                            }
+                          },
                         );
                       },
                     );
@@ -1464,9 +1422,9 @@ class FinancialSummaryCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _buildSummaryLine('Subtotal', cartState.subtotal.asCurrency),
+          _buildSummaryLine('Subtotal', cartState.subtotalAmount.asCurrency),
           Gap(AppSpacing.xxs.h),
-          _buildSummaryLine('Tax (5%)', cartState.taxAmount.asCurrency),
+          _buildSummaryLine('Tax', cartState.taxAmount.asCurrency),
           if (cartState.discountPercent > 0) ...[
             Gap(AppSpacing.xxs.h),
             _buildSummaryLine(

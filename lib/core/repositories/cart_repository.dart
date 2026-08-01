@@ -687,6 +687,27 @@ class CartRepository {
     return _mockCarts[tableId]!;
   }
 
+  Cart _recalculateMockCartTotals(Cart cart) {
+    int subtotalMinor = 0;
+    for (final item in cart.items) {
+      int itemPriceMinor = item.unitPriceMinorSnapshot;
+      for (final mod in item.modifiers) {
+        itemPriceMinor += mod.priceDeltaMinorSnapshot;
+      }
+      subtotalMinor += itemPriceMinor * item.quantity;
+    }
+    
+    // Simple 5% tax calculation for mock
+    int taxMinor = (subtotalMinor * 0.05).round();
+    int grandTotalMinor = subtotalMinor + taxMinor;
+    
+    return cart.copyWith(
+      subtotalMinor: subtotalMinor,
+      totalTaxMinor: taxMinor,
+      grandTotalMinor: grandTotalMinor,
+    );
+  }
+
   Cart _addMockCartItem({
     required String tenantId,
     required String branchId,
@@ -740,11 +761,11 @@ class CartRepository {
 
     list.add(newItem);
 
-    final updated = current.copyWith(
+    final updated = _recalculateMockCartTotals(current.copyWith(
       versionNum: current.versionNum + 1,
       updatedAt: DateTime.now(),
       items: list,
-    );
+    ));
     _mockCarts[tableId] = updated;
     return updated;
   }
@@ -776,11 +797,11 @@ class CartRepository {
       return item;
     }).toList();
 
-    final updated = current.copyWith(
+    final updated = _recalculateMockCartTotals(current.copyWith(
       versionNum: current.versionNum + 1,
       updatedAt: DateTime.now(),
       items: updatedItems,
-    );
+    ));
     _mockCarts[tableId] = updated;
     return updated;
   }
@@ -800,11 +821,11 @@ class CartRepository {
 
     final updatedItems = current.items.where((item) => item.id != itemId).toList();
 
-    final updated = current.copyWith(
+    final updated = _recalculateMockCartTotals(current.copyWith(
       versionNum: current.versionNum + 1,
       updatedAt: DateTime.now(),
       items: updatedItems,
-    );
+    ));
     _mockCarts[tableId] = updated;
     return updated;
   }
@@ -822,11 +843,11 @@ class CartRepository {
       throw const StaleCartRevisionException();
     }
 
-    final updated = current.copyWith(
+    final updated = _recalculateMockCartTotals(current.copyWith(
       orderNotes: orderNotes,
       versionNum: current.versionNum + 1,
       updatedAt: DateTime.now(),
-    );
+    ));
     _mockCarts[tableId] = updated;
     return updated;
   }

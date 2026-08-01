@@ -60,50 +60,57 @@ class POSCartItem {
 class POSCartState {
   const POSCartState({
     this.items = const [],
-    this.discountPercent = 0.0,
-    this.taxPercent = 5.0,
     this.isLoading = false,
     this.errorMessage,
     this.isSchemaMismatch = false,
     this.backendCartVersionNum = 1,
     this.backendCartId,
+    this.subtotalAmount = 0.0,
+    this.discountAmount = 0.0,
+    this.taxAmount = 0.0,
+    this.total = 0.0,
+    this.discountPercent = 0.0,
   });
 
   final List<POSCartItem> items;
-  final double discountPercent;
-  final double taxPercent;
   final bool isLoading;
   final String? errorMessage;
   final bool isSchemaMismatch; // If true, displays blocking config mismatch error
   final int backendCartVersionNum; // expectedCartRevision version_num
   final String? backendCartId;
+  final double subtotalAmount;
+  final double discountAmount;
+  final double taxAmount;
+  final double total;
+  final double discountPercent;
 
-  double get subtotal => items.fold(0.0, (sum, item) => sum + item.subtotal);
-  double get discountAmount => subtotal * (discountPercent / 100);
-  double get taxableAmount => subtotal - discountAmount;
-  double get taxAmount => taxableAmount * (taxPercent / 100);
-  double get total => taxableAmount + taxAmount;
   int get totalQty => items.fold(0, (sum, item) => sum + item.qty);
 
   POSCartState copyWith({
     List<POSCartItem>? items,
-    double? discountPercent,
-    double? taxPercent,
     bool? isLoading,
     ValueGetter<String?>? errorMessage,
     bool? isSchemaMismatch,
     int? backendCartVersionNum,
     String? backendCartId,
+    double? subtotalAmount,
+    double? discountAmount,
+    double? taxAmount,
+    double? total,
+    double? discountPercent,
   }) =>
       POSCartState(
         items: items ?? this.items,
-        discountPercent: discountPercent ?? this.discountPercent,
-        taxPercent: taxPercent ?? this.taxPercent,
         isLoading: isLoading ?? this.isLoading,
         errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
         isSchemaMismatch: isSchemaMismatch ?? this.isSchemaMismatch,
         backendCartVersionNum: backendCartVersionNum ?? this.backendCartVersionNum,
         backendCartId: backendCartId ?? this.backendCartId,
+        subtotalAmount: subtotalAmount ?? this.subtotalAmount,
+        discountAmount: discountAmount ?? this.discountAmount,
+        taxAmount: taxAmount ?? this.taxAmount,
+        total: total ?? this.total,
+        discountPercent: discountPercent ?? this.discountPercent,
       );
 }
 
@@ -213,12 +220,21 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
   }
 
   /// Add item to cart
-  Future<void> addItem(MenuItem menuItem) async {
+  Future<void> addItem(MenuItem menuItem, {List<String>? selectedModifiers}) async {
     if (tenantId == null || branchId == null) return;
 
-    // Check if the item already exists with exact same modifiers (none, by default when adding from book)
+    final mods = selectedModifiers ?? [];
+
+    try {
+      _validateModifiers(menuItem, mods);
+    } on CartValidationException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: () => e.message);
+      return;
+    }
+
+    // Check if the item already exists with exact same modifiers
     final existingIndex = state.items.indexWhere(
-        (i) => i.menuItem.id == menuItem.id && i.selectedModifiers.isEmpty);
+        (i) => i.menuItem.id == menuItem.id && listEquals(i.selectedModifiers..sort(), mods.toList()..sort()));
 
     state = state.copyWith(isLoading: true, errorMessage: () => null);
 
@@ -237,9 +253,6 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
           expectedCartRevision: state.backendCartVersionNum,
         );
       } else {
-        // Validate modifier constraints (defaulting to empty modifier selection)
-        _validateModifiers(menuItem, []);
-
         updatedCart = await repository.addCartItem(
           tenantId: tenantId!,
           branchId: branchId!,
@@ -266,11 +279,13 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
   }
 
   /// Decrement or remove item from cart
-  Future<void> removeItem(MenuItem menuItem) async {
+  Future<void> removeItem(MenuItem menuItem, {List<String>? selectedModifiers, String? backendId}) async {
     if (tenantId == null || branchId == null) return;
 
-    // Remove the last matching item by ID
-    final existingIndex = state.items.lastIndexWhere((i) => i.menuItem.id == menuItem.id);
+    // Remove by backendId if provided, else fall back to exact modifiers matching
+    final existingIndex = backendId != null 
+        ? state.items.lastIndexWhere((i) => i.backendId == backendId)
+        : state.items.lastIndexWhere((i) => i.menuItem.id == menuItem.id && listEquals(i.selectedModifiers..sort(), (selectedModifiers ?? [])..sort()));
     if (existingIndex < 0) return;
 
     final existingItem = state.items[existingIndex];
@@ -431,7 +446,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
       mutationEnvelopeBody: {
         'cart_id': state.backendCartId,
         'discount_percent': state.discountPercent,
-        'tax_percent': state.taxPercent,
+        'tax_percent': 5.0, // Backend might override this
       },
     );
     ref?.read(inactivityServiceProvider).resetTimer();
@@ -474,13 +489,16 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
 
     state = POSCartState(
       items: mappedItems,
-      discountPercent: state.discountPercent,
-      taxPercent: state.taxPercent,
       isLoading: false,
       errorMessage: null,
       isSchemaMismatch: false,
       backendCartVersionNum: cart.versionNum,
       backendCartId: cart.id,
+      subtotalAmount: cart.subtotalMinor / 100.0,
+      discountAmount: cart.discountMinor / 100.0,
+      taxAmount: cart.totalTaxMinor / 100.0,
+      total: cart.grandTotalMinor / 100.0,
+      discountPercent: state.discountPercent,
     );
   }
 }

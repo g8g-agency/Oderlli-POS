@@ -64,14 +64,7 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
               
-              // ── Manager Quick Operations (Manager Only) ──────────────────────
-              if (role == UserRole.manager)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                    child: _ManagerQuickActions(),
-                  ),
-                ),
+
 
               // ── Dynamic Section Lists based on Role ──────────────────────────
               if (role == UserRole.server) ...[
@@ -502,58 +495,6 @@ class _StatsRow extends ConsumerWidget {
   }
 }
 
-// ── Manager Quick Actions Widget ─────────────────────────────────────────────
-
-class _ManagerQuickActions extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return POSCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.admin_panel_settings, color: AppColors.primary, size: 20.sp),
-              Gap(8.w),
-              Text(
-                'Manager Quick Operations',
-                style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          Gap(12.h),
-          Row(
-            children: [
-              Expanded(
-                child: SecondaryButton(
-                  onPressed: () => context.push('/checkout/refund'),
-                  text: 'ISSUE REFUND',
-                  icon: Icons.assignment_return,
-                ),
-              ),
-              Gap(12.w),
-              Expanded(
-                child: SecondaryButton(
-                  onPressed: () => context.go('/shifts'),
-                  text: 'SHIFT CONTROL',
-                  icon: Icons.lock,
-                ),
-              ),
-              Gap(12.w),
-              Expanded(
-                child: SecondaryButton(
-                  onPressed: () => context.go('/settings'),
-                  text: 'SETTINGS',
-                  icon: Icons.settings,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // ── Order card ───────────────────────────────────────────────────────────────
 

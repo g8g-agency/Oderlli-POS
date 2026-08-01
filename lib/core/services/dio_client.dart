@@ -13,9 +13,9 @@ class DioClient {
   final DeviceFingerprintService _fingerprintService;
   final Ref? _ref;
 
-  // Stream controller to notify when a session has expired (refresh failed)
-  final _sessionExpiredController = StreamController<void>.broadcast();
-  Stream<void> get onSessionExpired => _sessionExpiredController.stream;
+  // Stream controller to notify when a session has expired (true = org, false = staff)
+  final _sessionExpiredController = StreamController<bool>.broadcast();
+  Stream<bool> get onSessionExpired => _sessionExpiredController.stream;
 
   // Single-flight refresh locks
   bool _isRefreshing = false;
@@ -116,6 +116,19 @@ class DioClient {
             // Avoid infinite loops if refreshing fails
             if (path.contains('/auth/refresh') ||
                 path.contains('/auth/login')) {
+              return handler.next(error);
+            }
+
+            // Check if the 401 was caused by an expired Staff Runtime Token
+            final authHeader = error.requestOptions.headers['Authorization'] as String?;
+            final staffToken = await _secureStorage.getRuntimeToken();
+            final isStaffToken = authHeader != null && staffToken != null && authHeader == 'Bearer $staffToken';
+
+            if (isStaffToken) {
+              // The STAFF token expired. Do not refresh the org token.
+              // Clear staff token and force employee logout.
+              await _secureStorage.clearRuntimeToken();
+              _sessionExpiredController.add(false); // false = staff expired
               return handler.next(error);
             }
 
@@ -226,7 +239,7 @@ class DioClient {
 
   void _triggerSessionExpired() {
     _secureStorage.clearSession();
-    _sessionExpiredController.add(null);
+    _sessionExpiredController.add(true); // true = org expired
   }
 
   void dispose() {

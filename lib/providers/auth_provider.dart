@@ -129,8 +129,12 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._ref) : super(const AuthState()) {
     // Listen to session expiration events from the HTTP client
-    _ref.read(dioClientProvider).onSessionExpired.listen((_) {
-      _handleSessionExpired();
+    _ref.read(dioClientProvider).onSessionExpired.listen((isOrgExpired) {
+      if (isOrgExpired) {
+        logoutLocally();
+      } else {
+        _handleSessionExpired();
+      }
     });
   }
 

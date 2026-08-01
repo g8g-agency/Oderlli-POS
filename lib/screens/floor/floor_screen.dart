@@ -337,15 +337,6 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
         children: [
           Text('Quick Actions', style: AppTextStyles.titleLarge),
           Gap(16.h),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _startCounterOrder,
-              icon: const Icon(Icons.storefront),
-              label: const Text('COUNTER / WALK-IN'),
-            ),
-          ),
-          Gap(16.h),
           if (_selectedTable != null) ...[
             _buildSelectedTablePanel(ref),
           ] else ...[
