@@ -93,7 +93,7 @@ class OrdersNotifier extends StateNotifier<List<Order>> {
     String? orderNotes,
   }) async {
     debugPrint('[DEBUG] orders_provider checkout: tableId=$tableId, cartId=$cartId');
-    debugPrint('[DEBUG] PosConstants.counterTableId=${PosConstants.counterTableId}, isCounterTable=${PosConstants.isCounterTable(tableId)}');
+    debugPrint('[DEBUG] checkout tableId=$tableId');
 
     // 1. Pre-condition Validation
     final cartState = ref.read(posCartProvider);
@@ -111,7 +111,8 @@ class OrdersNotifier extends StateNotifier<List<Order>> {
       String finalCartId = cartId;
       int finalCartRevision = expectedCartRevision;
 
-      if (tableId == PosConstants.counterTableId || PosConstants.isCounterTable(tableId)) {
+      final counterTable = ref.read(counterTableProvider);
+      if (counterTable != null && tableId == counterTable.id) {
         debugPrint('[DEBUG] Detected counter table checkout! Syncing cart to backend...');
         final itemsToSync = cartState.items.map((item) => {
           'menuItem': item.menuItem,

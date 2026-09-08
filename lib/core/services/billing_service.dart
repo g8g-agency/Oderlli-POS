@@ -8,10 +8,10 @@ class BillingService {
   BillingService(this._dioClient);
 
   /// GET /api/v1/billing/projections/table/:tableId
-  Future<Map<String, dynamic>> fetchTableProjection(String tableId) async {
+  Future<List<dynamic>> fetchTableProjection(String tableId) async {
     final response = await _dioClient.dio.get('/api/v1/billing/projections/table/$tableId');
     _assertSuccess(response);
-    return response.data['data']['projections'] as Map<String, dynamic>;
+    return response.data['data']['projections'] as List<dynamic>;
   }
 
   /// POST /api/v1/billing/bills/aggregate

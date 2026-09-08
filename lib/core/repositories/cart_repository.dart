@@ -54,7 +54,9 @@ class CartRepository {
   // Local in-memory carts for mock fallback (restricted to debug mode only)
   final Map<String, Cart> _mockCarts = {};
 
-  CartRepository(this._cartService, this._connectivityService);
+  final bool Function(String tableId) _isCounterTable;
+
+  CartRepository(this._cartService, this._connectivityService, this._isCounterTable);
 
   /// Helper to check if fallback is allowed
   Future<bool> _shouldUseMockFallback() async {
@@ -123,9 +125,7 @@ class CartRepository {
   Future<String> _getOrResolveSessionToken(
       String branchId, String tableId) async {
     // Counter sentinel — never hits the API
-    if (tableId == '00000000-0000-0000-0000-000000000001' ||
-        tableId == PosConstants.counterTableId ||
-        PosConstants.isCounterTable(tableId)) {
+    if (tableId == '00000000-0000-0000-0000-000000000001' || _isCounterTable(tableId)) {
       _tableSessionTokens[tableId] = 'counter-session-token';
       return 'counter-session-token';
     }
@@ -234,8 +234,7 @@ class CartRepository {
 
   /// GET /api/v1/cart
   Future<Cart> getCart(String tenantId, String branchId, String tableId) async {
-    if (tableId == PosConstants.counterTableId ||
-        PosConstants.isCounterTable(tableId)) {
+    if (tableId == '00000000-0000-0000-0000-000000000001' || _isCounterTable(tableId)) {
       return _getOrCreateMockCart(tenantId, branchId, tableId);
     }
     final useFallback = await _shouldUseMockFallback();
@@ -270,8 +269,7 @@ class CartRepository {
     List<String> selectedModifiers = const [],
     required int expectedCartRevision,
   }) async {
-    if (tableId == PosConstants.counterTableId ||
-        PosConstants.isCounterTable(tableId)) {
+    if (tableId == '00000000-0000-0000-0000-000000000001' || _isCounterTable(tableId)) {
       return _addMockCartItem(
         tenantId: tenantId,
         branchId: branchId,
@@ -385,8 +383,7 @@ class CartRepository {
     required int itemVersionNum,
     required int expectedCartRevision,
   }) async {
-    if (tableId == PosConstants.counterTableId ||
-        PosConstants.isCounterTable(tableId)) {
+    if (tableId == '00000000-0000-0000-0000-000000000001' || _isCounterTable(tableId)) {
       return _updateMockCartItem(
         tableId: tableId,
         itemId: itemId,
@@ -463,8 +460,7 @@ class CartRepository {
     required int itemVersionNum,
     required int expectedCartRevision,
   }) async {
-    if (tableId == PosConstants.counterTableId ||
-        PosConstants.isCounterTable(tableId)) {
+    if (tableId == '00000000-0000-0000-0000-000000000001' || _isCounterTable(tableId)) {
       return _removeMockCartItem(
         tableId: tableId,
         itemId: itemId,
@@ -532,8 +528,7 @@ class CartRepository {
     required String? orderNotes,
     required int expectedCartRevision,
   }) async {
-    if (tableId == PosConstants.counterTableId ||
-        PosConstants.isCounterTable(tableId)) {
+    if (tableId == '00000000-0000-0000-0000-000000000001' || _isCounterTable(tableId)) {
       return _updateMockCartNotes(
         tableId: tableId,
         orderNotes: orderNotes,

@@ -47,7 +47,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final selectedTableId = ref.watch(cartSelectedTableProvider);
     final tables = ref.watch(posTablesProvider).valueOrNull ?? [];
     final isCounterOrder = selectedTableId != null &&
-        PosConstants.isCounterTable(selectedTableId);
+        ref.read(counterTableProvider)?.id == selectedTableId;
 
     // If activeTableIdProvider from Floor Plan is set, pre-fill selectedTableId
     final floorSelectedTableId = ref.watch(activeTableIdProvider);
@@ -325,7 +325,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
                              // For real table orders, require a valid backend cart
                              final isCounter = isCounterOrder ||
-                                 PosConstants.isCounterTable(checkoutTableId);
+                                 ref.read(counterTableProvider)?.id == checkoutTableId;
                              if (!isCounter && (cartState.backendCartId == null ||
                                  cartState.backendCartId!.isEmpty)) {
                                setState(() => _isSending = false);

@@ -113,6 +113,11 @@ class POSTablesNotifier extends AsyncNotifier<List<TableModel>> {
 
 final posSelectedSectionProvider = StateProvider<String?>((ref) => null);
 
+final counterTableProvider = Provider<TableModel?>((ref) {
+  final tables = ref.watch(posTablesProvider).valueOrNull ?? [];
+  return tables.where((t) => t.number == 0 || t.sectionName?.toLowerCase() == 'counter' || t.floorName?.toLowerCase() == 'counter').firstOrNull;
+});
+
 final posFilteredTablesProvider = Provider<List<TableModel>>((ref) {
   final tablesAsync = ref.watch(posTablesProvider);
   final tables = tablesAsync.valueOrNull ?? [];
@@ -224,20 +229,10 @@ final liveTableStatusProvider = Provider<List<TableModel>>((ref) {
     final order = activeOrderByTable[table.id];
     if (order == null) return enrichedTable;
 
-    // Derive status from order when it adds more precision than runtimeState
-    POSTableStatus enrichedStatus = table.status;
-    if (order.status != OrderStatus.served &&
-        order.status != OrderStatus.completed &&
-        order.status != OrderStatus.cancelled) {
-      if (table.status == POSTableStatus.available) {
-        enrichedStatus = POSTableStatus.occupied;
-      }
-    }
-
     return enrichedTable.copyWith(
       billTotal: order.total,
       occupiedSince: order.createdAt,
-      status: enrichedStatus,
+      status: table.status, // Enforce authoritative backend state, remove artificial override
     );
   }).toList();
 });

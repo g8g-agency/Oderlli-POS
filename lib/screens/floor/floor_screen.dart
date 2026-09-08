@@ -61,8 +61,17 @@ class _FloorScreenState extends ConsumerState<FloorScreen> {
     final branchId = ref.read(authProvider).branchId;
     if (branchId == null) return;
 
-    final counterTableId = PosConstants.counterTableId;
-    _selectTableForOrdering(counterTableId);
+    final counterTable = ref.read(counterTableProvider);
+    if (counterTable == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No counter table found in this branch.')),
+        );
+      }
+      return;
+    }
+    
+    _selectTableForOrdering(counterTable.id);
     setState(() => _selectedTable = null);
     context.go('/menu');
   }

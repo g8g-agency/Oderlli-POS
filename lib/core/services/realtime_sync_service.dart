@@ -1,14 +1,34 @@
+import 'dart:ui';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/providers.dart';
 
-class RealtimeSyncService {
+class RealtimeSyncService with WidgetsBindingObserver {
   RealtimeChannel? _channel;
+  String? _lastBranchId;
+  Ref? _lastRef;
+
+  RealtimeSyncService() {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_lastBranchId != null && _lastRef != null) {
+        debugPrint('[RealtimeSyncService] App resumed. Resubscribing...');
+        subscribe(_lastBranchId!, _lastRef!);
+      }
+    }
+  }
 
   void subscribe(String branchId, Ref ref) {
+    _lastBranchId = branchId;
+    _lastRef = ref;
     // Unsubscribe from any existing subscription first to prevent duplicates
-    dispose();
+    _unsubscribe();
 
     debugPrint('[RealtimeSyncService] Subscribing to realtime for branch: $branchId');
     try {
@@ -64,9 +84,9 @@ class RealtimeSyncService {
     }
   }
 
-  void dispose() {
+  void _unsubscribe() {
     if (_channel != null) {
-      debugPrint('[RealtimeSyncService] Disposing realtime channel.');
+      debugPrint('[RealtimeSyncService] Unsubscribing from realtime channel.');
       try {
         _channel!.unsubscribe();
       } catch (e) {
@@ -74,6 +94,11 @@ class RealtimeSyncService {
       }
       _channel = null;
     }
+  }
+
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _unsubscribe();
   }
 }
 

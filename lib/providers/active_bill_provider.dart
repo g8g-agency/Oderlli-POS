@@ -151,6 +151,7 @@ class ActiveBillState {
     bool? isSubmittingPayment,
     String? Function()? paymentError,
     bool? paymentsHydrated,
+    String? billId,
   }) =>
       ActiveBillState(
         order: order ?? this.order,
@@ -346,7 +347,6 @@ class ActiveBillNotifier extends StateNotifier<ActiveBillState?> {
     final currentState = state;
     if (currentState == null) return;
 
-    final orderId = currentState.order.id;
     final previousState = currentState;
 
     // Set loading/submitting flag and clear any prior error
@@ -371,7 +371,7 @@ class ActiveBillNotifier extends StateNotifier<ActiveBillState?> {
       String mappedMethod = method.toLowerCase();
       if (mappedMethod == 'upi') mappedMethod = 'qr_pay';
       
-      final updatedBill = await billingService.settleBill(
+      await billingService.settleBill(
         billId: targetBillId,
         paymentMethod: mappedMethod,
         amountMinor: amountMinor,

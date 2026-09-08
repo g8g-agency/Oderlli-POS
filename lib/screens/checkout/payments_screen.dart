@@ -18,17 +18,12 @@ class PaymentsScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
-  int _activeTab = 0; // 0: Cash, 1: Card, 2: UPI, 3: Mixed Payment
+  int _activeTab = 0; // 0: Cash, 1: Card, 2: UPI
   String? _loadingMessage;
   
   // Cash mode states
   String _cashTendered = '';
   
-  // Mixed mode states
-  final TextEditingController _mixedCashController = TextEditingController(text: '0.00');
-  final TextEditingController _mixedCardController = TextEditingController(text: '0.00');
-  final TextEditingController _mixedUpiController = TextEditingController(text: '0.00');
-
   @override
   void initState() {
     super.initState();
@@ -55,9 +50,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
 
   @override
   void dispose() {
-    _mixedCashController.dispose();
-    _mixedCardController.dispose();
-    _mixedUpiController.dispose();
     super.dispose();
   }
 
@@ -90,21 +82,8 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
       return (raw * 100).round();
     } else if (_activeTab == 1 || _activeTab == 2) {
       return remainingPaise;
-    } else {
-      final c = ((double.tryParse(_mixedCashController.text) ?? 0.0) * 100).round();
-      final d = ((double.tryParse(_mixedCardController.text) ?? 0.0) * 100).round();
-      final u = ((double.tryParse(_mixedUpiController.text) ?? 0.0) * 100).round();
-      return c + d + u;
     }
-  }
-
-  void _distributeMixedEvenly(double remainingVal) {
-    final splitVal = (remainingVal / 3).toStringAsFixed(2);
-    setState(() {
-      _mixedCashController.text = splitVal;
-      _mixedCardController.text = splitVal;
-      _mixedUpiController.text = splitVal;
-    });
+    return 0;
   }
 
   Future<void> _onCompletePayment(double remainingVal) async {
@@ -118,8 +97,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
         _loadingMessage = 'Connecting to Card Reader...';
       } else if (_activeTab == 2) {
         _loadingMessage = 'Verifying UPI / QR Code scan...';
-      } else {
-        _loadingMessage = 'Processing Multi-Tender Allocations...';
       }
     });
 
@@ -172,32 +149,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
         await billNotifier.addPayment('UPI', remainingVal);
         if (!mounted) return;
         context.showSuccessSnack('UPI payment of ${remainingVal.asCurrency} scanned & approved.');
-      } else {
-        // Mixed Payment mode
-        final cashVal = double.tryParse(_mixedCashController.text) ?? 0.0;
-        final cardVal = double.tryParse(_mixedCardController.text) ?? 0.0;
-        final upiVal = double.tryParse(_mixedUpiController.text) ?? 0.0;
-        
-        int transactionCount = 0;
-        if (cashVal > 0) {
-          await billNotifier.addPayment('Cash', cashVal);
-          if (!mounted) return;
-          transactionCount++;
-        }
-        if (cardVal > 0) {
-          await billNotifier.addPayment('Card', cardVal);
-          if (!mounted) return;
-          transactionCount++;
-        }
-        if (upiVal > 0) {
-          await billNotifier.addPayment('UPI', upiVal);
-          if (!mounted) return;
-          transactionCount++;
-        }
-        
-        if (transactionCount > 0) {
-          context.showSuccessSnack('Multi-tender payment recorded ($transactionCount transactions).');
-        }
       }
 
       if (!mounted) return;
@@ -344,8 +295,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 _buildTabCard('CARD', Icons.credit_card, 1),
                 Gap(12.w),
                 _buildTabCard('UPI / QR', Icons.qr_code_scanner, 2),
-                Gap(12.w),
-                _buildTabCard('MIXED', Icons.account_balance_wallet_outlined, 3),
               ],
             ),
             Gap(16.h),
@@ -558,8 +507,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
         return _buildCardContent();
       case 2:
         return _buildUpiContent();
-      case 3:
-        return _buildMixedContent(remainingPaise);
       default:
         return Container();
     }
@@ -761,136 +708,9 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
     );
   }
 
-  // MIXED PAYMENT MODE LAYOUT
-  Widget _buildMixedContent(int remainingPaise) {
-    final remainingVal = remainingPaise / 100.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'Mixed Tender Allocations',
-                style: AppTextStyles.titleLarge,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Gap(8.w),
-            TextButton.icon(
-              onPressed: () => _distributeMixedEvenly(remainingVal),
-              icon: const Icon(Icons.splitscreen_outlined, size: 16),
-              label: const Text('SPLIT EQUALLY'),
-            ),
-          ],
-        ),
-        Gap(20.h),
-        
-        context.isVerticalLayout
-            ? Column(
-                children: [
-                  _buildMixedInputSlot(
-                    'CASH TENDER',
-                    Icons.money,
-                    _mixedCashController,
-                  ),
-                  Gap(12.h),
-                  _buildMixedInputSlot(
-                    'CARD CHARGE',
-                    Icons.credit_card,
-                    _mixedCardController,
-                  ),
-                  Gap(12.h),
-                  _buildMixedInputSlot(
-                    'UPI / QR SCAN',
-                    Icons.qr_code_scanner,
-                    _mixedUpiController,
-                  ),
-                ],
-              )
-            : Row(
-                children: [
-                  // Cash Allocation
-                  Expanded(
-                    child: _buildMixedInputSlot(
-                      'CASH TENDER',
-                      Icons.money,
-                      _mixedCashController,
-                    ),
-                  ),
-                  Gap(16.w),
-                  // Card Allocation
-                  Expanded(
-                    child: _buildMixedInputSlot(
-                      'CARD CHARGE',
-                      Icons.credit_card,
-                      _mixedCardController,
-                    ),
-                  ),
-                  Gap(16.w),
-                  // UPI Allocation
-                  Expanded(
-                    child: _buildMixedInputSlot(
-                      'UPI / QR SCAN',
-                      Icons.qr_code_scanner,
-                      _mixedUpiController,
-                    ),
-                  ),
-                ],
-              ),
-        Gap(24.h),
-        Text(
-          'Allocate portions of the remaining balance to different methods. The COMPLETE button on the right will become active once allocations are specified.',
-          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
-        ),
-      ],
-    );
-  }
+  // MIXED PAYMENT MODE LAYOUT REMOVED
 
-  Widget _buildMixedInputSlot(String label, IconData icon, TextEditingController controller) {
-    return POSCard(
-      backgroundColor: AppColors.surfaceVariant,
-      padding: EdgeInsets.all(16.r),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16.sp, color: AppColors.primary),
-              Gap(8.w),
-              Expanded(
-                child: Text(
-                  label,
-                  style: AppTextStyles.labelSmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          Gap(12.h),
-          TextField(
-            controller: controller,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            onChanged: (val) {
-              // Trigger build update to recalculate tendered totals
-              setState(() {});
-            },
-            decoration: InputDecoration(
-              prefixText: CurrencyFormatter.symbol,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            ),
-            style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.w800),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   Widget _buildSummaryRow(String label, String value, {bool isHighlight = false, Color? color}) {
     return Row(

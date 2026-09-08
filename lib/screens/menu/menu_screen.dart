@@ -96,7 +96,7 @@ class MenuScreen extends ConsumerWidget {
       }
     }
     final isCounterOrder =
-        tableId != null && PosConstants.isCounterTable(tableId);
+        tableId != null && ref.read(counterTableProvider)?.id == tableId;
 
     final isVertical = context.isVerticalLayout;
 
@@ -915,7 +915,7 @@ class _OrderCartPanelState extends ConsumerState<OrderCartPanel> {
 
   Widget _buildAlreadyOrderedSection() {
     final tableId = ref.watch(cartSelectedTableProvider) ?? ref.watch(activeTableIdProvider);
-    if (tableId == null || PosConstants.isCounterTable(tableId)) {
+    if (tableId == null || ref.read(counterTableProvider)?.id == tableId) {
       return const SizedBox.shrink();
     }
 

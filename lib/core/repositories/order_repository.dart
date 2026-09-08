@@ -120,7 +120,7 @@ class OrderRepository {
       'mutation_id': mutationId,
       'mutation_sequence': 0,
       'runtime_version': 1,
-      'session_id': _uuid.v4(),
+      'session_id': sessionToken,
       'tenant_id': tenantId,
       'branch_id': branchId,
       'client_timestamp': DateTime.now().toUtc().toIso8601String(),

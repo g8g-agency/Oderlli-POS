@@ -45,11 +45,16 @@ class TableSelectionScreen extends ConsumerWidget {
                   ),
                 ),
                 onPressed: () {
-                  ref.read(cartSelectedTableProvider.notifier).state =
-                      PosConstants.counterTableId;
-                  ref.read(activeTableIdProvider.notifier).state =
-                      PosConstants.counterTableId;
-                  context.go(AppRoutes.posMenu);
+                  final counterTable = ref.read(counterTableProvider);
+                  if (counterTable != null) {
+                    ref.read(cartSelectedTableProvider.notifier).state = counterTable.id;
+                    ref.read(activeTableIdProvider.notifier).state = counterTable.id;
+                    context.go(AppRoutes.posMenu);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('No counter table found in this branch.')),
+                    );
+                  }
                 },
               ),
             ),
@@ -84,7 +89,8 @@ class TableSelectionScreen extends ConsumerWidget {
                               itemCount: tables.length,
                               itemBuilder: (context, index) {
                                 final table = tables[index];
-                                if (table.id == PosConstants.counterTableId) {
+                                final counterTable = ref.read(counterTableProvider);
+                                if (counterTable != null && table.id == counterTable.id) {
                                   return const SizedBox.shrink();
                                 }
                                 return POSTableCard(

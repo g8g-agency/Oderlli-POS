@@ -128,9 +128,11 @@ final orderServiceProvider = Provider<OrderService>((ref) {
 });
 
 final cartRepositoryProvider = Provider<CartRepository>((ref) {
-  final service = ref.watch(cartServiceProvider);
-  final conn = ref.watch(connectivityServiceProvider);
-  return CartRepository(service, conn);
+  final cartService = ref.watch(cartServiceProvider);
+  final connectivity = ref.watch(connectivityServiceProvider);
+  return CartRepository(cartService, connectivity, (tableId) {
+    return ref.read(counterTableProvider)?.id == tableId;
+  });
 });
 
 final cartSessionIdsProvider = Provider<({String? tenantId, String? branchId})>((ref) {
@@ -171,7 +173,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
       final cart = await repository.getCart(
         tenantId!,
         branchId!,
-        tableId ?? PosConstants.counterTableId,
+        tableId ?? ref!.read(counterTableProvider)?.id ?? '',
       );
       _updateStateFromCart(cart);
     } on DatabaseSchemaMismatchException catch (e) {
@@ -246,7 +248,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         updatedCart = await repository.updateCartItem(
           tenantId: tenantId!,
           branchId: branchId!,
-          tableId: tableId ?? PosConstants.counterTableId,
+          tableId: tableId ?? ref!.read(counterTableProvider)?.id ?? '',
           itemId: existingItem.backendId ?? '',
           quantity: existingItem.qty + 1,
           itemNotes: existingItem.notes,
@@ -257,7 +259,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         updatedCart = await repository.addCartItem(
           tenantId: tenantId!,
           branchId: branchId!,
-          tableId: tableId ?? PosConstants.counterTableId,
+          tableId: tableId ?? ref!.read(counterTableProvider)?.id ?? '',
           menuItem: menuItem,
           quantity: 1,
           expectedCartRevision: state.backendCartVersionNum,
@@ -298,7 +300,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         updatedCart = await repository.updateCartItem(
           tenantId: tenantId!,
           branchId: branchId!,
-          tableId: tableId ?? PosConstants.counterTableId,
+          tableId: tableId ?? ref!.read(counterTableProvider)?.id ?? '',
           itemId: existingItem.backendId ?? '',
           quantity: existingItem.qty - 1,
           itemNotes: existingItem.notes,
@@ -309,7 +311,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
         updatedCart = await repository.removeCartItem(
           tenantId: tenantId!,
           branchId: branchId!,
-          tableId: tableId ?? PosConstants.counterTableId,
+          tableId: tableId ?? ref!.read(counterTableProvider)?.id ?? '',
           itemId: existingItem.backendId ?? '',
           itemVersionNum: existingItem.versionNum,
           expectedCartRevision: state.backendCartVersionNum,
@@ -342,7 +344,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
       final updatedCart = await repository.updateCartItem(
         tenantId: tenantId!,
         branchId: branchId!,
-        tableId: tableId ?? PosConstants.counterTableId,
+        tableId: tableId ?? ref!.read(counterTableProvider)?.id ?? '',
         itemId: existingItem.backendId ?? '',
         quantity: existingItem.qty,
         itemNotes: notes,
@@ -395,7 +397,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
       var updatedCart = await repository.removeCartItem(
         tenantId: tenantId!,
         branchId: branchId!,
-        tableId: tableId ?? PosConstants.counterTableId,
+        tableId: tableId ?? ref!.read(counterTableProvider)?.id ?? '',
         itemId: existingItem.backendId ?? '',
         itemVersionNum: existingItem.versionNum,
         expectedCartRevision: state.backendCartVersionNum,
@@ -405,7 +407,7 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
       updatedCart = await repository.addCartItem(
         tenantId: tenantId!,
         branchId: branchId!,
-        tableId: tableId ?? PosConstants.counterTableId,
+        tableId: tableId ?? ref!.read(counterTableProvider)?.id ?? '',
         menuItem: existingItem.menuItem,
         quantity: existingItem.qty,
         itemNotes: existingItem.notes,
@@ -440,7 +442,8 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
       throw Exception('No active cart to check out.');
     }
 
-    if (tableId != null && tableId != PosConstants.counterTableId) {
+    final counterTable = ref!.read(counterTableProvider);
+    if (tableId != null && (counterTable == null || tableId != counterTable.id)) {
       try {
         await ref?.read(tableServiceProvider).startSession(tableId!);
       } catch (e) {
@@ -530,8 +533,9 @@ final posCartProvider = StateNotifierProvider<POSCartNotifier, POSCartState>((re
 
   // Only load from backend when we have a real table selected.
   // Counter orders and null table start with an empty local cart.
-  final isRealTable = selectedTableId != null &&
-      !PosConstants.isCounterTable(selectedTableId);
+  final isCounter = selectedTableId == '00000000-0000-0000-0000-000000000001' ||
+      ref.read(counterTableProvider)?.id == selectedTableId;
+  final isRealTable = selectedTableId != null && !isCounter;
 
   if (isRealTable &&
       sessionIds.tenantId != null &&
