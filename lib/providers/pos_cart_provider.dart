@@ -10,6 +10,7 @@ import '../models/models.dart';
 import 'auth_provider.dart';
 import 'menu_provider.dart';
 import 'inactivity_provider.dart';
+import 'table_provider.dart';
 
 /// State provider for selected table in the cart screen.
 final cartSelectedTableProvider = StateProvider<String?>((ref) => null);
@@ -438,6 +439,15 @@ class POSCartNotifier extends StateNotifier<POSCartState> {
     if (state.backendCartId == null) {
       throw Exception('No active cart to check out.');
     }
+
+    if (tableId != null && tableId != PosConstants.counterTableId) {
+      try {
+        await ref?.read(tableServiceProvider).startSession(tableId!);
+      } catch (e) {
+        debugPrint('Failed to explicitly start session before checkout: $e');
+      }
+    }
+
     final order = await orderService.checkout(
       staffToken: staffToken,
       mutationId: const Uuid().v4(),

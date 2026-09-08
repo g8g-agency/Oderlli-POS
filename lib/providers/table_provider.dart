@@ -79,71 +79,30 @@ class POSTablesNotifier extends AsyncNotifier<List<TableModel>> {
     state = await AsyncValue.guard(() => _fetch());
   }
 
-  // Mutate local state so the UI reflects changes (optimistic updates/mock operations)
+  // Optimistic UI updates removed. POS relies on backend SSE for state.
   void updateStatus(String tableId, POSTableStatus status) {
-    final currentList = state.valueOrNull;
-    if (currentList != null) {
-      state = AsyncValue.data(
-        currentList.map((t) => t.id == tableId ? t.copyWith(status: status) : t).toList(),
-      );
-    }
+    // State is driven by SSE projection now.
   }
 
   void updateBill(String tableId, double amount) {
-    final currentList = state.valueOrNull;
-    if (currentList != null) {
-      state = AsyncValue.data(
-        currentList.map((t) => t.id == tableId ? t.copyWith(billTotal: amount) : t).toList(),
-      );
-    }
+    // State is driven by SSE projection now.
   }
 
   void seatTable(String tableId, int guestCount, String waiter) {
-    final currentList = state.valueOrNull;
-    if (currentList != null) {
-      state = AsyncValue.data(
-        currentList.map((t) => t.id == tableId
-            ? t.copyWith(
-                status: POSTableStatus.occupied,
-                guestCount: guestCount,
-                waiterName: waiter,
-                occupiedSince: DateTime.now(),
-              )
-            : t).toList(),
-      );
-    }
+    // State is driven by SSE projection now.
   }
 
   Future<void> clearTable(String tableId) async {
-    // 1. Optimistic update — mark table as available immediately in UI
-    final currentList = state.valueOrNull;
-    if (currentList != null) {
-      state = AsyncValue.data(
-        currentList.map((t) =>
-          t.id == tableId
-              ? t.copyWith(
-                  status: POSTableStatus.available,
-                  guestCount: 0,
-                  waiterName: null,
-                  occupiedSince: null,
-                  billTotal: 0.0,
-                )
-              : t
-        ).toList(),
-      );
-    }
-
     try {
-      // 2. Evict QR session cache for this table
+      // 1. Evict QR session cache for this table locally
       ref.read(cartRepositoryProvider).evictTableSession(tableId);
 
-      // 3. Call backend vacate
+      // 2. Call backend vacate
       await ref.read(tableRepositoryProvider).vacateTable(tableId);
 
-      // 4. Re-fetch verified state from backend
+      // 3. (Optional) Re-fetch verified state from backend or wait for SSE
       await refreshTables();
     } catch (e) {
-      // 5. ROLLBACK — revert optimistic update by re-fetching real state
       await refreshTables();
       rethrow;
     }

@@ -24,7 +24,7 @@ import '../screens/cart/cart_screen.dart';
 import '../screens/checkout/checkout_shell.dart';
 import '../screens/checkout/billing_screen.dart';
 import '../screens/checkout/payments_screen.dart';
-import '../screens/checkout/split_billing_screen.dart';
+
 import '../screens/checkout/refunds_screen.dart';
 import '../screens/shell/main_shell.dart';
 import 'app_routes.dart';
@@ -252,14 +252,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               child: const PaymentsScreen(),
             ),
           ),
-          GoRoute(
-            path: AppRoutes.splitBilling,
-            name: 'split-billing',
-            pageBuilder: (context, state) => _buildHorizontalSlideTransitionPage(
-              key: state.pageKey,
-              child: const SplitBillingScreen(),
-            ),
-          ),
+
         ],
       ),
       GoRoute(

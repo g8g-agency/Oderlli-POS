@@ -13,7 +13,7 @@ import '../../core/extensions/extensions.dart';
 ///
 /// Nested Shell layout for the Checkout/Payment flow.
 /// Persistently displays the receipt summary on the left (40% width)
-/// while rendering the active step (Billing, Payments, Split, Refunds) on the right.
+/// while rendering the active step (Billing, Payments, Refunds) on the right.
 class CheckoutShell extends ConsumerWidget {
   const CheckoutShell({
     super.key,

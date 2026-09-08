@@ -31,21 +31,29 @@ class _ReviewsScreenState extends ConsumerState<ReviewsScreen> {
 
       if (response.statusCode == 200) {
         final data = response.data;
-        setState(() {
-          _reviews = data['data'] ?? [];
-        });
+        if (mounted) {
+          setState(() {
+            _reviews = data['data'] ?? [];
+          });
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load reviews. Status: ${response.statusCode}')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to load reviews. Status: ${response.statusCode}')),
+          );
+        }
       }
     } catch (e) {
-      print('Error fetching reviews: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading reviews')),
-      );
+      debugPrint('Error fetching reviews: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error loading reviews')),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

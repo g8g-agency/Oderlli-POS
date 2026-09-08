@@ -57,6 +57,14 @@ class TableService {
     _assertSuccess(response);
   }
 
+  /// POST /api/v1/admin/tables/:tableId/session/start
+  Future<void> startSession(String tableId) async {
+    final response = await _dioClient.dio.post(
+      '/api/v1/admin/tables/$tableId/session/start',
+    );
+    _assertSuccess(response);
+  }
+
   void _assertSuccess(Response<dynamic> response) {
     if (response.data == null || response.data['success'] != true) {
       throw DioException(

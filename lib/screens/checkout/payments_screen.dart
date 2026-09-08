@@ -41,9 +41,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
           _cashTendered = amountParam;
         }
         if (methodParam != null) {
-          if (methodParam == 'cash') _activeTab = 0;
-          else if (methodParam == 'card') _activeTab = 1;
-          else if (methodParam == 'upi') _activeTab = 2;
+          if (methodParam == 'cash') {
+            _activeTab = 0;
+          } else if (methodParam == 'card') {
+            _activeTab = 1;
+          } else if (methodParam == 'upi') {
+            _activeTab = 2;
+          }
         }
       });
     });

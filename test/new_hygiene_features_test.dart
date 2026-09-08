@@ -83,7 +83,7 @@ class StubDioClient implements DioClient {
   StubDioClient(this.dio);
   
   @override
-  final onSessionExpired = Stream<void>.empty();
+  final onSessionExpired = Stream<bool>.empty();
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

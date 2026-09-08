@@ -188,16 +188,7 @@ class BillingScreen extends ConsumerWidget {
           padding: EdgeInsets.fromLTRB(AppSpacing.lg.r, 0, AppSpacing.lg.r, AppSpacing.lg.r),
           child: Row(
             children: [
-              Expanded(
-                child: SecondaryButton(
-                  onPressed: billState.isPaid
-                      ? null
-                      : () => context.go('/checkout/split-billing'),
-                  text: 'SPLIT BILL',
-                  icon: Icons.call_split,
-                ),
-              ),
-              Gap(AppSpacing.md.w),
+
               Expanded(
                 child: PrimaryButton(
                   onPressed: billState.isPaid

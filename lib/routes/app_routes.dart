@@ -22,7 +22,7 @@ abstract final class AppRoutes {
   // Checkout nested shell routes
   static const String billing = '/checkout';
   static const String payments = '/checkout/payment';
-  static const String splitBilling = '/checkout/split-billing';
+
   static const String refunds = '/checkout/refund';
 }
 

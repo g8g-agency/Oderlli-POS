@@ -8,6 +8,7 @@ import 'orders_provider.dart';
 import 'table_provider.dart';
 import 'shift_provider.dart';
 import 'inactivity_provider.dart';
+import 'billing_provider.dart';
 
 /// Tracks the active table being checked out.
 final activeTableIdProvider = StateProvider<String?>((ref) => null);
@@ -94,9 +95,11 @@ class ActiveBillState {
     this.isSubmittingPayment = false,
     this.paymentError,
     this.paymentsHydrated = false,
+    this.billId,
   });
 
   final Order order;
+  final String? billId;
   final double discountPercent;
   final double serviceChargePercent;
   final List<PaymentRecord> payments;
@@ -157,6 +160,7 @@ class ActiveBillState {
         isSubmittingPayment: isSubmittingPayment ?? this.isSubmittingPayment,
         paymentError: paymentError != null ? paymentError() : this.paymentError,
         paymentsHydrated: paymentsHydrated ?? this.paymentsHydrated,
+        billId: billId ?? this.billId,
       );
 }
 
@@ -243,51 +247,54 @@ class ActiveBillNotifier extends StateNotifier<ActiveBillState?> {
   Future<void> loadPayments() async {
     final currentState = state;
     if (currentState == null) return;
-    final orderId = currentState.order.id;
 
     try {
-      final secureStorage = _ref.read(secureStorageProvider);
-      final staffToken = await secureStorage.getRuntimeToken();
-      if (staffToken == null || staffToken.isEmpty) {
-        throw Exception('Not authenticated');
+      final billingService = _ref.read(billingServiceProvider);
+      final projections = await billingService.fetchTableProjection(currentState.order.tableId);
+
+      if (projections.isNotEmpty) {
+        // Find if any bill contains our active order
+        final proj = projections.firstWhere(
+          (p) => (p['orders'] as List<dynamic>).any((o) => o['id'] == currentState.order.id),
+          orElse: () => null,
+        );
+
+        if (proj != null) {
+          final bill = proj['bill'];
+          final settlements = proj['settlements'] as List<dynamic>? ?? [];
+
+          final payments = settlements.map((s) {
+            return PaymentRecord(
+              id: s['id']?.toString() ?? '',
+              method: s['payment_method'] ?? 'cash',
+              amount: (s['amount_minor'] as int? ?? 0) / 100.0,
+              timestamp: DateTime.tryParse(s['created_at']?.toString() ?? '') ?? DateTime.now(),
+              waiterName: currentState.order.servedBy ?? 'Staff',
+              amountMinor: s['amount_minor'] as int? ?? 0,
+            );
+          }).toList();
+
+          state = state!.copyWith(
+            billId: bill['id'] as String?,
+            payments: payments,
+            paymentsHydrated: true,
+          );
+          return;
+        }
       }
 
-      final dioClient = _ref.read(dioClientProvider);
-      final response = await dioClient.dio.get(
-        '/api/v1/orders/$orderId/payments',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $staffToken',
-          },
-        ),
+      state = state!.copyWith(
+        payments: const <PaymentRecord>[],
+        paymentsHydrated: true,
       );
-
-      // Protect against race conditions: verify order ID hasn't changed while request was in-flight
-      if (state == null || state!.order.id != orderId) return;
-
-      if (response.data != null) {
-        // If data is a list directly or wrapped in a success payload
-        final List<dynamic> rawList = response.data is List
-            ? response.data
-            : (response.data['data'] as List<dynamic>? ?? []);
-        
-        final payments = rawList.map((item) => PaymentRecord.fromJson(item as Map<String, dynamic>)).toList();
-        
-        state = state!.copyWith(
-          payments: payments,
-          paymentsHydrated: true,
-        );
-      } else {
-        throw Exception('Response data is null');
-      }
     } catch (e) {
-      // If the fetch fails (network error or 404): set state.payments = [] and state.paymentsHydrated = false — do not crash, silently start fresh
-      if (state != null && state!.order.id == orderId) {
-        state = state!.copyWith(
-          payments: const <PaymentRecord>[],
-          paymentsHydrated: false,
-        );
+      if (kDebugMode) {
+        debugPrint('[ActiveBillNotifier] Failed to load payments via projection: $e');
       }
+      state = state!.copyWith(
+        payments: const <PaymentRecord>[],
+        paymentsHydrated: false,
+      );
     }
   }
 
@@ -349,40 +356,29 @@ class ActiveBillNotifier extends StateNotifier<ActiveBillState?> {
     );
 
     try {
-      final secureStorage = _ref.read(secureStorageProvider);
-      final staffToken = await secureStorage.getRuntimeToken();
-      if (staffToken == null || staffToken.isEmpty) {
-        throw Exception('Not authenticated. Please log in again.');
+      final billingService = _ref.read(billingServiceProvider);
+      String? targetBillId = currentState.billId;
+
+      if (targetBillId == null) {
+        final billResult = await billingService.aggregateOrdersIntoBill(
+          tableId: currentState.order.tableId,
+          orderIds: [currentState.order.id],
+        );
+        targetBillId = billResult['id'] as String;
       }
 
-      final idempotencyKey = const Uuid().v4();
       final amountMinor = (amount * 100).round();
-
-      final dioClient = _ref.read(dioClientProvider);
-      final response = await dioClient.dio.post(
-        '/api/v1/orders/$orderId/payments',
-        data: {
-          'method': method,
-          'amount_minor': amountMinor,
-          'idempotency_key': idempotencyKey,
-        },
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $staffToken',
-            'Idempotency-Key': idempotencyKey,
-            'Content-Type': 'application/json',
-          },
-        ),
+      String mappedMethod = method.toLowerCase();
+      if (mappedMethod == 'upi') mappedMethod = 'qr_pay';
+      
+      final updatedBill = await billingService.settleBill(
+        billId: targetBillId,
+        paymentMethod: mappedMethod,
+        amountMinor: amountMinor,
       );
 
-      if (response.data == null ||
-          (response.data['success'] != true && response.data['status'] != 'success')) {
-        throw Exception('Payment API failed');
-      }
-
       final newPayment = PaymentRecord(
-        id: response.data['data']?['payment']?['id']?.toString() ??
-            'pay-${DateTime.now().millisecondsSinceEpoch}',
+        id: 'pay-${DateTime.now().millisecondsSinceEpoch}',
         method: method,
         amount: amount,
         timestamp: DateTime.now(),
@@ -392,6 +388,7 @@ class ActiveBillNotifier extends StateNotifier<ActiveBillState?> {
       final updatedPayments = [...currentState.payments, newPayment];
       
       state = currentState.copyWith(
+        billId: targetBillId,
         payments: updatedPayments,
         isSubmittingPayment: false,
         paymentError: () => null,
@@ -407,16 +404,13 @@ class ActiveBillNotifier extends StateNotifier<ActiveBillState?> {
             );
       }
 
+      // The table status (FREE/PAYMENT_PENDING) is now strictly driven by backend SSE.
+      // 1. If bill is paid, backend automatically marks the guest_session as closed and rebuilds the projection.
+      // 2. POS will receive an SSE update and reflect the new state.
+      
       final currentRemaining = state?.amountRemainingPaise ?? 0;
       if (currentRemaining <= 0) {
-        final tableId = currentState.order.tableId;
-        const counterTableId = '00000000-0000-0000-0000-000000000001';
-        if (tableId != counterTableId) {
-          _ref.read(posTablesProvider.notifier).clearTable(tableId);
-        }
         _ref.read(ordersProvider.notifier).updateStatus(currentState.order.id, OrderStatus.served);
-      } else {
-        _ref.read(posTablesProvider.notifier).updateStatus(currentState.order.tableId, POSTableStatus.paymentPending);
       }
     } on DioException catch (e) {
       final statusCode = e.response?.statusCode;

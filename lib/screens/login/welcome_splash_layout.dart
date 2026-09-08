@@ -124,7 +124,7 @@ class WelcomeSplashLayout extends StatelessWidget {
                         runSpacing: 16,
                         children: [
                           _buildFeatureCard(Icons.bolt_rounded, 'Fast\nBilling', isDark, brandRed),
-                          _buildFeatureCard(Icons.splitscreen_rounded, 'Split\nPayments', isDark, brandRed),
+
                           _buildFeatureCard(Icons.sync_rounded, 'Live\nKitchen Sync', isDark, brandRed),
                           _buildFeatureCard(Icons.table_restaurant_rounded, 'Table\nManagement', isDark, brandRed),
                           _buildFeatureCard(Icons.receipt_long_rounded, 'Real-time\nOrders', isDark, brandRed),

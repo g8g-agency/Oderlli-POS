@@ -126,7 +126,7 @@ class _ModifierSelectionDialogState extends ConsumerState<ModifierSelectionDialo
             Expanded(
               child: ListView.separated(
                 itemCount: widget.item.modifierGroups.length,
-                separatorBuilder: (_, __) => Gap(24.h),
+                separatorBuilder: (_, _) => Gap(24.h),
                 itemBuilder: (context, index) {
                   final group = widget.item.modifierGroups[index];
                   final isRequired = group.isRequired;

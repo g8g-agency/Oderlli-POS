@@ -340,7 +340,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                              final checkoutBranchId = sessionIds.branchId ?? '';
                              final cartId = cartState.backendCartId ?? '';
 
-                             // TODO: tenantId/branchId should never be empty here — if this fires, trace auth state init order in CartScreen's parent route.
+                             // NOTE: tenantId/branchId should never be empty here — if this fires, trace auth state init order in CartScreen's parent route.
                              assert(tenantId.isNotEmpty && checkoutBranchId.isNotEmpty,
                                'CartScreen: tenantId or branchId is empty — auth state was not ready when this screen built.');
 
